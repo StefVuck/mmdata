@@ -12,7 +12,7 @@ const CLIPS = [
   { name: 'act4-nic', query: 'act=4&beat=unpack&advance=0.5', frames: 44, dt: 1 / 3.6 },
   { name: 'act5-core', query: 'act=5&beat=tuned&advance=4', frames: 44, dt: 1 / 7, hud: true },
   { name: 'act5-beam', query: 'act=5&beat=verdict&advance=9', frames: 44, dt: 1 / 12,
-    setup: (d) => { const a = d.act; a.freeDilation = 2e3; a.t = 0.03 * d.timeline.duration; a.setCamera('overview'); a.setPanel(false); } },
+    setup: (d) => { const a = d.act; a.freeDilation = 3e3; a.t = 0.05 * d.timeline.duration; a.setCamera('memory'); for (let k = 0; k < 150; k++) d.frame(1 / 30); } },
 ];
 
 (async () => {

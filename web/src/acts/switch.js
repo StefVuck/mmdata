@@ -29,7 +29,7 @@ function portPath(i, y, outward) {
 export class SwitchAct extends Act {
   constructor(ctx) {
     super(ctx);
-    this.bloomStrength = 1.1;
+    this.bloomStrength = 0.6;
     this.receiptIds = ['switch', 'patch'];
     const s = this.scene;
     s.background = new THREE.Color(0x02040a);

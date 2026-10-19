@@ -6,7 +6,7 @@
 **[▶ Watch it live](https://your-deployment.example.com)** -->
 **▶ Live demo: link coming soon**
 
-![The core at ×2,000: a burst at the open becomes a beam, with every cache miss hanging beneath it](docs/media/act5-beam.gif)
+![The core at ×3,000: every cache miss is a round trip across the board, out to the DIMMs and back](docs/media/act5-beam.gif)
 
 This project follows a single Nasdaq TotalView-ITCH packet from the exchange's matching engine, down 100 metres of fibre, through a layer 1 switch and a network card, into a CPU core, and out again as an order. It plays as a Three.js film in five acts, and every nanosecond spent in our own software is measured, not animated.
 
@@ -44,11 +44,11 @@ Light becomes current. The Ethernet, IP and UDP headers peel off, the MoldUDP64 
 
 ![Act V: our message in the tuned lane, with the code for each stage alongside](docs/media/act5-core.gif)
 
-The naive and tuned lanes process the same packet on the same machine. Cache misses drop into wells below the pipeline whose depth is proportional to latency (L2, L3, DRAM), and branch mispredicts shatter and rewind. A receipt along the bottom totals tick to trade for both lanes, segment by segment.
+Act V is a motherboard seen from above, drawn to scale with latency: one unit of board is one nanosecond of travel. The naive and tuned builds run on two cores of the same CPU and read the same ring buffer, which the network card's DMA writes straight into L3. Every cache miss is a real round trip to wherever the data lives: to the L2 beside the core, across the die to an L3 slice, or out through the memory controller and along the DDR traces to a DIMM. Branch mispredicts shatter and rewind. Orders leave through the PCIe root complex to the network card. A receipt along the bottom totals tick to trade for both builds, segment by segment.
 
 Alongside, a code card shows the naive and tuned source for whichever stage our message is in. The snippets are cut from `decoder/src` at build time, so they are always the code that was measured. During a stall, the lines that touch memory light up in the colour of the level being waited on. Which line stalled is an annotation, since the counters are per stage, not per line.
 
-The act ends in free play: a slow-motion slider from real time to ×10⁹, overview, follow, wells and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both lanes.
+The act ends in free play: a slow-motion slider from real time to ×10⁹, overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both lanes.
 
 ## Running it
 

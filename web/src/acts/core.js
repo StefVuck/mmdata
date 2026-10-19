@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Act } from './act.js';
 import { Script } from '../script.js';
 import { Follow, smooth, lerp, fmtNs, fmtDilation, dust } from '../fx.js';
-import { Pipeline, EGRESS_X } from '../core/pipeline.js';
+import { Pipeline } from '../core/pipeline.js';
 import { BookTerrain } from '../core/terrain.js';
 import { CodeCard } from '../code.js';
 import { TX_NS } from '../timing.js';
@@ -10,9 +10,9 @@ import { STAGES, STAGE_TITLES, TYPE_NAMES, WIRE, FIBRE_NS_PER_M } from '../journ
 
 const TRAIL_WALL = 0.35;
 const CAMERAS = {
-  overview: { pos: [15, 12, 31], look: [19, -3, 0] },
-  wells: { pos: [19, -6, 64], look: [19, -22, 0] },
-  book: { pos: [64, 9.5, 23], look: [64, 0.5, -4] },
+  overview: { pos: [2, 46, 25], look: [3, 0, 1] },
+  memory: { pos: [12, 24, 30], look: [16, 0, 0] },
+  book: { pos: [4, 13, 6], look: [4, 0, -32] },
 };
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -20,8 +20,8 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export class CoreAct extends Act {
   constructor(ctx) {
     super(ctx);
-    this.bloomStrength = 1.1;
-    this.bloomThreshold = 0.22;
+    this.bloomStrength = 0.6;
+    this.bloomThreshold = 0.55;
     const s = this.scene;
     s.background = new THREE.Color(0x02030a);
     s.fog = new THREE.FogExp2(0x02030a, 0.0065);
@@ -29,7 +29,7 @@ export class CoreAct extends Act {
 
     const tl = this.timeline;
     this.pipeline = new Pipeline(tl, s);
-    this.terrain = new BookTerrain(tl, s, new THREE.Vector3(64, -0.75, 8));
+    this.terrain = new BookTerrain(tl, s, new THREE.Vector3(4, 0.1, -24));
     this.follow = new Follow(this.camera, 2.4);
     this.v = new THREE.Vector3();
     this.v2 = new THREE.Vector3();
@@ -43,11 +43,11 @@ export class CoreAct extends Act {
 
     this.script = new Script([
       { id: 'arrive', hold: 6, dilation: () => dil(tuned.done[hero] - this.tStart, 14, 2e7, 2e9), snapDilation: true,
-        caption: () => `Inside core 3. Our packet's ${tl.heroPacketCount} messages land in the ring buffer. Two builds of our software read the same feed: a <span style="color:var(--naive)">naive</span> lane and a <span style="color:var(--tuned)">tuned</span> lane.` },
+        caption: () => `Inside core 3. Our packet's ${tl.heroPacketCount} messages land in the ring buffer, which the card writes straight into L3. Two builds of our software read it, each on its own core: <span style="color:var(--naive)">naive</span> on core 2, <span style="color:var(--tuned)">tuned</span> on core 3.` },
       { id: 'tuned', sim: () => tuned.done[hero] - this.tStart, dilation: () => dil(tuned.done[hero] - this.tStart, 14, 2e7, 2e9),
         caption: () => (tuned.stalls(hero).some((l) => l.length)
-          ? 'Each drop into the wells below is a cache miss. The depth is how far the core had to go for its data: L2, L3, or all the way out to DRAM.'
-          : 'Everything the tuned lane needs is already in L1, so our message never leaves the track. Behind it, the naive lane keeps diving into the wells below: L2, L3, or all the way out to DRAM.') },
+          ? 'Every trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond. L2 sits beside the core, L3 across the die, and DRAM out on the DIMMs past the memory controller.'
+          : 'Everything the tuned build needs is already in L1, so our message never leaves its core. Next door, the naive build keeps making the trip across the die to L3, and out to the DIMMs.') },
       { id: 'out', sim: TX_NS, dilation: 1e8,
         caption: () => `Signal fired, risk passed, order encoded. <b>Tick to trade, tuned: ${fmtNs(ttt(1))}</b> from the exchange's packet to our order on the wire.` },
       { id: 'naive', sim: () => Math.max(1, naive.done[hero] + TX_NS - this.t), dilation: () => dil(naive.done[hero] + TX_NS - this.t, 11, 1e3, 2e9),
@@ -86,7 +86,7 @@ export class CoreAct extends Act {
       <div class="ctl-row"><label>Lanes</label><div class="chips"><button class="chip lane-0 on" data-lane="0">Naive</button><button class="chip lane-1 on" data-lane="1">Tuned</button></div></div>
       <div class="ctl-row"><label>Camera</label><div class="chips">
         <button class="chip" data-cam="follow">Follow</button><button class="chip" data-cam="overview">Overview</button>
-        <button class="chip" data-cam="wells">Wells</button><button class="chip" data-cam="book">Book</button></div></div>
+        <button class="chip" data-cam="memory">Memory</button><button class="chip" data-cam="book">Book</button></div></div>
       <div class="ctl-row"><label></label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Our message</button><button class="chip" id="ctl-replay">Replay journey</button></div></div>
       <div class="ctl-row"><label>Panel</label><div class="chips"><button class="chip on" data-panel="code">Code</button><button class="chip" data-panel="numbers">Numbers</button></div></div>`;
     const dil = root.querySelector('#ctl-dil');
@@ -203,7 +203,7 @@ export class CoreAct extends Act {
     this.updateCode();
 
     if (this.mode === 'free') {
-      this.inspector.hidden = this.showCode;
+      this.inspector.hidden = this.code.visible;
       if (document.activeElement !== this.dilInput) this.dilInput.value = String(Math.log10(this.freeDilation));
       document.getElementById('ctl-dil-val').textContent = fmtDilation(this.freeDilation);
       if (document.activeElement !== this.timeInput) this.timeInput.value = String(Math.round((this.t / tl.duration) * 1000));
@@ -219,7 +219,7 @@ export class CoreAct extends Act {
   // script, and in free play whenever the code panel is chosen.
   updateCode() {
     const id = this.mode === 'script' ? this.script.id : null;
-    const show = this.mode === 'free' ? this.showCode : id === 'tuned' || id === 'out' || id === 'naive';
+    const show = this.mode === 'free' ? this.showCode && this.camMode === 'follow' : id === 'tuned' || id === 'out';
     this.code.setVisible(show);
     if (!show) return;
     const [n, t] = this.pipeline.focusState;
@@ -258,8 +258,8 @@ export class CoreAct extends Act {
 
     if (id === 'arrive') {
       const k = smooth(this.script.progress * 1.2);
-      pos.set(lerp(-3, -7.5, k), lerp(0.8, 3.4, k), lerp(5.5, 13.5, k));
-      look.set(lerp(-1, 3, k), 0, 4.5);
+      pos.set(lerp(-19, -14, k), lerp(6, 17, k), lerp(9, 22, k));
+      look.set(-8, 0.6, 0);
     } else if (mode === 'follow') {
       const p = this.pipeline;
       const lane = p.focusAlive[1] ? 1 : p.focusAlive[0] ? 0 : -1;
@@ -268,11 +268,10 @@ export class CoreAct extends Act {
         look.set(...CAMERAS.overview.look);
       } else {
         const h = p.focusPos[lane];
-        const x = Math.min(h.x, EGRESS_X - 2);
         // With the code card open on the left, frame our message right of centre.
         const side = this.code.visible ? 1 : 0;
-        pos.set(x - 6.5 + side * 4, h.y + 4, h.z + 12.5);
-        look.set(x + 3 - side * 7.5, h.y - 0.6, h.z - 1);
+        pos.set(h.x - 4 + side * 3, h.y + 9, h.z + 10);
+        look.set(h.x + 2 - side * 6, h.y - 0.5, h.z - 1);
       }
     } else {
       const c = CAMERAS[mode];

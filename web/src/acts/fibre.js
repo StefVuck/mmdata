@@ -20,8 +20,8 @@ const CLAD_R = 0.11;
 export class FibreAct extends Act {
   constructor(ctx) {
     super(ctx);
-    this.bloomStrength = 0.9;
-    this.bloomThreshold = 0.3;
+    this.bloomStrength = 0.55;
+    this.bloomThreshold = 0.6;
     this.receiptIds = ['fibre'];
     const s = this.scene;
     s.background = new THREE.Color(0x010308);

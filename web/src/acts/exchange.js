@@ -12,7 +12,7 @@ const PORT = new THREE.Vector3(32.2, 1.55, 0);
 export class ExchangeAct extends Act {
   constructor(ctx) {
     super(ctx);
-    this.bloomStrength = 0.9;
+    this.bloomStrength = 0.6;
     const s = this.scene;
     s.background = new THREE.Color(0x02040a);
     s.fog = new THREE.FogExp2(0x02040a, 0.018);
@@ -225,7 +225,7 @@ export class ExchangeAct extends Act {
     this.sell.position.copy(meet).add(new THREE.Vector3(lerp(3.5, 0, approach), lerp(1.2, 0.25, approach), lerp(2.5, 0, approach)));
     const flashT = (matchP - 0.6) / 0.4;
     const matched = matchP >= 0.6;
-    this.flash.material.opacity = matched && id === 'engine' ? Math.max(0, 1 - flashT) * 1.4 : 0;
+    this.flash.material.opacity = matched && id === 'engine' ? Math.max(0, 1 - flashT) * 0.8 : 0;
     this.flash.scale.setScalar(1 + (matched ? flashT * 3 : 0));
     this.buy.visible = this.sell.visible = !matched || id === 'engine';
     this.buy.material.opacity = this.sell.material.opacity = matched ? Math.max(0, 1 - flashT * 2) : 1;

@@ -24,7 +24,7 @@ const SHELLS = [
 export class NicAct extends Act {
   constructor(ctx) {
     super(ctx);
-    this.bloomStrength = 1.0;
+    this.bloomStrength = 0.6;
     this.receiptIds = ['phy', 'pcie', 'poll'];
     const s = this.scene;
     s.background = new THREE.Color(0x020409);

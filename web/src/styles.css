@@ -243,3 +243,8 @@ body.intro #hud { opacity: 0; }
 .code-col pre .c { color: #5d6b85; font-style: italic; }
 .code-foot { margin-top: 8px; font-size: 10px; color: var(--faint); }
 @media (max-width: 760px) { #code { display: none; } }
+
+/* Readability over bright scenes */
+.label { background: rgba(2, 4, 10, 0.55); border-radius: 4px; }
+#caption { background: rgba(2, 4, 10, 0.55); border-radius: 12px; padding: 10px 18px; backdrop-filter: blur(6px); }
+#caption:empty { display: none; }

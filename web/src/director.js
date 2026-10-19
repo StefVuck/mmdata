@@ -24,7 +24,7 @@ export class Director {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 0.9;
     stage.appendChild(this.renderer.domElement);
 
     this.labels = new CSS2DRenderer({ element: document.getElementById('labels') });
@@ -39,7 +39,7 @@ export class Director {
 
     this.composer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.acts[0].scene, this.acts[0].camera);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.1, 0.55, 0.12);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.35, 0.55);
     this.composer.addPass(this.renderPass);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -82,8 +82,8 @@ export class Director {
     act.enter();
     this.renderPass.scene = act.scene;
     this.renderPass.camera = act.camera;
-    this.bloom.strength = act.bloomStrength ?? 1.1;
-    this.bloom.threshold = act.bloomThreshold ?? 0.12;
+    this.bloom.strength = act.bloomStrength ?? 0.6;
+    this.bloom.threshold = act.bloomThreshold ?? 0.55;
     this.hud.setAct(i);
   }
 
@@ -134,8 +134,8 @@ export class Director {
       }
     }
     this.whiteout.style.opacity = String(white);
-    const base = this.act.bloomStrength ?? 1.1;
-    this.bloom.strength = base + white * 2.5;
+    const base = this.act.bloomStrength ?? 0.6;
+    this.bloom.strength = base + white * 2;
 
     const a = this.act;
     this.hud.setDilation(a.dilation, a.held);

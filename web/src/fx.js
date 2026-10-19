@@ -13,13 +13,13 @@ export function label(text, className = 'label', html = false) {
 export function glow(color, opacity = 1, extra = {}) {
   return new THREE.MeshBasicMaterial({
     color, transparent: true, opacity, blending: THREE.AdditiveBlending,
-    depthWrite: false, toneMapped: false, ...extra,
+    depthWrite: false, ...extra,
   });
 }
 
 export function lineMaterial(color, opacity = 1) {
   return new THREE.LineBasicMaterial({
-    color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+    color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false,
   });
 }
 
@@ -69,7 +69,7 @@ export class Comet {
     const c = new THREE.Color();
     for (let i = 0; i < length; i++) {
       const f = 1 - i / length;
-      c.copy(this.color).multiplyScalar(i === 0 ? 3 : 1.6 * f * f);
+      c.copy(this.color).multiplyScalar(i === 0 ? 1.8 : 1.2 * f * f);
       this.mesh.setColorAt(i, c);
     }
     this.mesh.instanceColor.needsUpdate = true;
@@ -82,7 +82,7 @@ export class Comet {
     const c = new THREE.Color();
     for (let i = 0; i < this.length; i++) {
       const f = 1 - i / this.length;
-      c.copy(this.color).multiplyScalar(i === 0 ? 3 : 1.6 * f * f);
+      c.copy(this.color).multiplyScalar(i === 0 ? 1.8 : 1.2 * f * f);
       this.mesh.setColorAt(i, c);
     }
     this.mesh.instanceColor.needsUpdate = true;
