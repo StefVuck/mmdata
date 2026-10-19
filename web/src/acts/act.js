@@ -42,7 +42,7 @@ export class Act {
   get clockText() { return ''; }
   get stat() { return ''; }
 
-  // Time on the journey clock, which starts when the packet enters our cross-connect.
+  // Time on the journey clock, which starts when the packet enters the firm's cross-connect.
   journeyClock(ns) {
     const sign = ns < 0 ? '−' : '+';
     return `journey clock ${sign}${Math.abs(ns).toFixed(1)} ns`;

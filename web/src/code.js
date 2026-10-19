@@ -88,7 +88,7 @@ export class CodeCard {
         <div class="code-col lane-0"><div class="code-title"></div><pre></pre></div>
         <div class="code-col lane-1"><div class="code-title"></div><pre></pre></div>
       </div>
-      <div class="code-foot">Lit lines touch memory or branch. Which of them stalled is an annotation; the stall itself is measured.</div>`;
+      <div class="code-foot">Illustrative code written for this toy example. Lit lines touch memory or branch; which of them stalled is an annotation, the stall itself is measured.</div>`;
     this.stageEl = this.root.querySelector('.code-stage');
     this.whyEl = this.root.querySelector('.code-why');
     this.cols = [...this.root.querySelectorAll('.code-col')].map((c) => ({

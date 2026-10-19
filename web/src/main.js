@@ -32,7 +32,7 @@ async function boot() {
     trace.source === 'synthetic'
       ? 'Trace: illustrative, generated in the browser'
       : `Trace: ${trace.messageCount.toLocaleString()} ITCH messages in ${trace.packetTotal.toLocaleString()} MoldUDP64 packets`,
-    `Our packet: ${timeline.heroPacketCount} messages, carrying ${TYPE_NAMES[type] || type} on ${trace.heroSymbol}`,
+    `Featured packet: ${timeline.heroPacketCount} messages, carrying ${TYPE_NAMES[type] || type} on ${trace.heroSymbol}`,
     `Software time for it: tuned ${fmtNs(total(tuned))}, naive ${fmtNs(total(naive))}`,
   ].join('<br>');
 

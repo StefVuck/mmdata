@@ -6,9 +6,11 @@
 **[▶ Watch it live](https://your-deployment.example.com)** -->
 **▶ Live demo: link coming soon**
 
+> **Disclaimer.** This is a toy example written by an AI assistant (Claude) as a learning and visualisation exercise. It is not related to, derived from, endorsed by or representative of any employer's code, systems, infrastructure or trading practices, past or present. Nothing here reflects how any real firm builds or runs software. The "naive" and "tuned" builds are generic textbook illustrations, the trading logic is deliberately simplistic and not a real strategy, the bundled market data is synthetic, and the latency figures for hardware outside the decoder are typical published values rather than measurements of any real setup. It is provided as is, for education only, and is not investment advice.
+
 ![The core at ×3,000: every cache miss is a round trip across the board, out to the DIMMs and back](docs/media/act5-beam.gif)
 
-This project follows a single Nasdaq TotalView-ITCH packet from the exchange's matching engine, down 100 metres of fibre, through a layer 1 switch and a network card, into a CPU core, and out again as an order. It plays as a Three.js film in five acts, and every nanosecond spent in our own software is measured, not animated.
+This project follows a single Nasdaq TotalView-ITCH packet from the exchange's matching engine, down 100 metres of fibre, through a layer 1 switch and a network card, into a CPU core, and out again as an order. It plays as a Three.js film in five acts, and every nanosecond spent in the example trading software is measured, not animated.
 
 The software is real. `mmdecode` is a C++ ITCH decoder that runs two builds of the same trading pipeline side by side. The naive lane is the idiomatic version: polymorphic heap-allocated messages, `std::map` books keyed by strings, and orders built with `std::string`. The tuned lane is what a latency engineer would write: fixed-offset loads, a flat order table, best-first level arrays and a pre-filled order template. Both read the same feed and must reach the same decisions; the decoder warns and exits with a non-zero status if they ever disagree. Every stage of every message is timed with `rdtsc`, and where the machine allows it, hardware counters record the cache misses and branch mispredicts behind each stall.
 
@@ -26,7 +28,7 @@ A data centre hall, rows of trading firms' racks and the one machine that matter
 
 ![Act II: the pulse looping round the spool of extra fibre](docs/media/act2-fibre.gif)
 
-The camera rides alongside the light through our 100 metre cross-connect, at 4.9 ns a metre. On the way it loops round a spool of extra fibre: exchanges give every firm the same cable length, so being close buys nothing.
+The camera rides alongside the light through a trading firm's 100 metre cross-connect, at 4.9 ns a metre. On the way it loops round a spool of extra fibre: exchanges give every firm the same cable length, so being close buys nothing.
 
 ### III. The switch
 
@@ -38,19 +40,19 @@ A layer 1 switch never reads the packet. It repeats the signal to every subscrib
 
 ![Act IV: the headers peel away and the ITCH messages are written into the ring buffer](docs/media/act4-nic.gif)
 
-Light becomes current. The Ethernet, IP and UDP headers peel off, the MoldUDP64 packet opens, and its ITCH messages are written over PCIe straight into a ring buffer in our process's memory, where one core spins waiting for them. A ghost route shows the kernel network stack taking about 5 µs to do the same.
+Light becomes current. The Ethernet, IP and UDP headers peel off, the MoldUDP64 packet opens, and its ITCH messages are written over PCIe straight into a ring buffer in the trading process's memory, where one core spins waiting for them. A ghost route shows the kernel network stack taking about 5 µs to do the same.
 
 ### V. The core
 
-![Act V: our message in the tuned lane, with the code for each stage alongside](docs/media/act5-core.gif)
+![Act V: the featured message in the tuned lane, with the code for each stage alongside](docs/media/act5-core.gif)
 
 Act V is a motherboard seen from above, drawn to scale with latency: one unit of board is one nanosecond of travel. The naive and tuned builds run on two cores of the same CPU and read the same ring buffer, which the network card's DMA writes straight into L3. Every cache miss is a real round trip to wherever the data lives: to the L2 beside the core, across the die to an L3 slice, or out through the memory controller and along the DDR traces to a DIMM. Branch mispredicts shatter and rewind. Orders leave through the PCIe root complex to the network card. A receipt along the bottom totals tick to trade for both builds, segment by segment.
 
-Alongside, a code card shows the naive and tuned source for whichever stage our message is in. The snippets are cut from `decoder/src` at build time, so they are always the code that was measured. During a stall, the lines that touch memory light up in the colour of the level being waited on. Which line stalled is an annotation, since the counters are per stage, not per line.
+Alongside, a code card shows the naive and tuned source for whichever stage the featured message is in. The snippets are cut from `decoder/src` at build time, so they are always the code that was measured. During a stall, the lines that touch memory light up in the colour of the level being waited on. Which line stalled is an annotation, since the counters are per stage, not per line.
 
-The act is told in beats. First a race: our message replayed on both cores at the same instant, so you can watch tuned finish all six stages and send its order while naive is still updating its book. Then the same run one stage at a time, with the code card explaining each difference. The order goes out to the network card, a wider shot shows how the naive core had also fallen behind in the burst, and the order book appears with the price level our message emptied and the order that move triggered. The receipt lines the two builds up stage by stage, so every stage is visible for both even when tuned takes a few nanoseconds.
+The act is told in beats. First a race: the featured message replayed on both cores at the same instant, so you can watch tuned finish all six stages and send its order while naive is still updating its book. Then the same run one stage at a time, with the code card explaining each difference. The order goes out to the network card, a wider shot shows how the naive core had also fallen behind in the burst, and the order book appears with the price level the featured message emptied and the order that move triggered. The receipt lines the two builds up stage by stage, so every stage is visible for both even when tuned takes a few nanoseconds.
 
-A transport bar runs along the bottom throughout: pause, a timeline you can click or drag to jump anywhere in the trace (the burst at the open, our packet and every order are marked on it), the slow-motion slider from real time to ×10⁹, and a button to skip to free play or replay the story. Touching the timeline or the slider mid-story drops you into free play at that moment. Free play adds overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both builds.
+A transport bar runs along the bottom throughout: pause, a timeline you can click or drag to jump anywhere in the trace (the burst at the open, the featured packet and every order are marked on it), the slow-motion slider from real time to ×10⁹, and a button to skip to free play or replay the story. Touching the timeline or the slider mid-story drops you into free play at that moment. Free play adds overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both builds.
 
 ## Running it
 
@@ -72,7 +74,7 @@ A trace from the synthetic feed is committed in `web/public/trace.bin`, so `cd w
 | H | hide the overlay for a clean recording |
 | R | replay from the start |
 
-A few URL parameters help with demos and recordings:
+A few URL parameters help with recordings and sharing a particular moment:
 
 | Parameter | Effect |
 |---|---|
@@ -100,9 +102,9 @@ When `perf_event_open` is available, a separate pass reads four counters per sta
 
 Without counters (in a VM or container, or with `--no-counters`), the viewer infers stalls from how far each stage's time sits above that stage's typical time, and says so in the corner of the screen. Branch mispredicts cannot be inferred that way and are not shown.
 
-The viewer schedules each lane as a single core: a message starts once it has arrived and the previous message has finished, with arrival times taken from the exchange timestamps. That is how the naive lane builds a queue during a burst while the tuned lane keeps up. The decoder picks "our" message from inside such a burst unless you choose one with `--hero-message`.
+The viewer schedules each lane as a single core: a message starts once it has arrived and the previous message has finished, with arrival times taken from the exchange timestamps. That is how the naive lane builds a queue during a burst while the tuned lane keeps up. The decoder picks the featured message from inside such a burst unless you choose one with `--hero-message`.
 
-Everything outside our software (fibre, switch, network card, PCIe and the transmit path) uses typical published figures from `web/src/journey.js`. The receipt hatches those segments so nobody mistakes them for measurements. Change them to match your own setup.
+Everything outside the trading software (fibre, switch, network card, PCIe and the transmit path) uses typical published figures from `web/src/journey.js`. The receipt hatches those segments so nobody mistakes them for measurements. Change them to match your own setup.
 
 For the cleanest numbers, run on bare metal with the decoder pinned to an isolated core (`--cpu`), and set `kernel.perf_event_paranoid` to 2 or lower so user-space counters are allowed.
 
@@ -110,7 +112,7 @@ For the cleanest numbers, run on bare metal with the decoder pinned to an isolat
 
 The decoder builds and runs on Apple Silicon, with two differences. Hardware counters are Linux-only, so the viewer infers stalls from timing. And the only timer user code can read there, `cntvct_el0`, ticks at 24 MHz: about 42 ns a tick, longer than most tuned stages. So instead of keeping the fastest of three passes, `mmdecode` runs 25 passes (`--repeat` to change) and averages them. Each stage starts at a different point relative to the tick boundary on each pass, so the average converges on the true time even though every single reading is a whole number of ticks. Only clear outliers, such as interrupts, are dropped first. Against a simulated 24 MHz timer on x86, stage medians came out within a few nanoseconds of `rdtsc`, though individual readings for the shortest stages are noisier. `--average` forces this mode on any machine.
 
-For the trace you show on stage, an x86 Linux box with counters is still the better source.
+For the most faithful traces, an x86 Linux machine with counters is still the better source.
 
 ## Deploying
 

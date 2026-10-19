@@ -75,11 +75,11 @@ export class NicAct extends Act {
       { id: 'optic', sim: WIRE.opticPhyNs, dilation: 1e8, snapDilation: true,
         caption: 'The optic turns light back into an electrical signal, and the PHY recovers the bits.' },
       { id: 'unpack', sim: WIRE.macNs, dilation: 2e8,
-        caption: () => `Ethernet, IP and UDP headers come off. Inside the MoldUDP64 packet are <b>${this.timeline.heroPacketCount} ITCH messages</b>, ours among them.` },
+        caption: () => `Ethernet, IP and UDP headers come off. Inside the MoldUDP64 packet are <b>${this.timeline.heroPacketCount} ITCH messages</b>, including the featured message.` },
       { id: 'dma', sim: WIRE.pcieNs, dilation: 2.5e7,
-        caption: 'Kernel bypass: the card writes the messages straight into a ring buffer in our process’s memory over PCIe. No interrupt, no system call, no copy.' },
+        caption: 'Kernel bypass: the card writes the messages straight into a ring buffer in the trading process’s memory over PCIe. No interrupt, no system call, no copy.' },
       { id: 'poll', sim: WIRE.pollNs, dilation: 1e8,
-        caption: 'Core 3 does nothing but spin on that ring. On its next check it sees the new slot, and picks up our message.' },
+        caption: 'Core 3 does nothing but spin on that ring. On its next check it sees the new slot, and picks up the featured message.' },
     ], 1e8);
     this.v = new THREE.Vector3();
     this.v2 = new THREE.Vector3();
@@ -162,7 +162,7 @@ export class NicAct extends Act {
       s.add(cell);
       this.cells.push(cell);
     }
-    const rl = label('Ring buffer in our memory', 'label');
+    const rl = label('Ring buffer in process memory', 'label');
     rl.position.set(7, RING_Y + 0.9, RING_Z);
     s.add(rl);
 
@@ -222,7 +222,7 @@ export class NicAct extends Act {
       s.add(mesh);
       if (hero) {
         const sym = trace.symbols.get(trace.msgLocate[idx]) || trace.heroSymbol;
-        const l = label(`Ours · ${TYPE_NAMES[type] || type} · ${sym}`, 'label hero');
+        const l = label(`Featured · ${TYPE_NAMES[type] || type} · ${sym}`, 'label hero');
         l.position.set(0, 0.55, 0);
         mesh.add(l);
         this.heroLabel = l;

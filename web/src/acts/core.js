@@ -52,11 +52,11 @@ export class CoreAct extends Act {
     };
     const order = this.story
       ? `${this.story.orderSide === 'B' ? 'BUY' : 'SELL'} 100 ${tl.trace.heroSymbol} @ ${price(this.story.orderPrice)}`
-      : 'our order';
+      : 'the order';
 
     this.script = new Script([
       { id: 'arrive', hold: 7, dilation: 1e8, snapDilation: true, onStart: at(this.tStart),
-        caption: () => `Inside the CPU. Our packet's ${tl.heroPacketCount} messages land in the ring buffer, which the network card writes straight into L3. Two builds of the same trading code read it, each on its own core: <span style="color:var(--naive)">naive</span> on core 2, <span style="color:var(--tuned)">tuned</span> on core 3. Both run the same six stages and reach the same decision.` },
+        caption: () => `Inside the CPU. The packet's ${tl.heroPacketCount} messages land in the ring buffer, which the network card writes straight into L3. Two builds of the same trading code read it, each on its own core: <span style="color:var(--naive)">naive</span> on core 2, <span style="color:var(--tuned)">tuned</span> on core 3. Both run the same six stages and reach the same decision.` },
       { id: 'race', sim: raceNs, dilation: () => dil(raceNs, 16, 1e7, 2e9), onStart: at(tuned.start[hero] - 2, raceOffset),
         onEnd: () => { this.pipeline.laneOffset[0] = 0; },
         caption: () => {
@@ -64,21 +64,21 @@ export class CoreAct extends Act {
           let s = 0;
           const rb = hero * (naive.S + 1);
           while (s < naive.S - 1 && naive.rel[rb + s + 1] <= tunedNs) s++;
-          return `First, a race. Our message on both cores, starting at the same instant. Tuned runs all six stages in <b>${fmtNs(tunedNs)}</b>. At that moment naive is still in its <em>${STAGE_TITLES[s]}</em> stage, and needs <b>${fmtNs(service(naive))}</b> in all. The numbers above each stage are the two builds' times.`;
+          return `First, a race. The featured message on both cores, starting at the same instant. Tuned runs all six stages in <b>${fmtNs(tunedNs)}</b>. At that moment naive is still in its <em>${STAGE_TITLES[s]}</em> stage, and needs <b>${fmtNs(service(naive))}</b> in all. The numbers above each stage are the two builds' times.`;
         } },
       { id: 'detail', sim: () => tuned.done[hero] - this.tStart, dilation: () => dil(tuned.done[hero] - this.tStart, 16, 2e7, 2e9),
         onStart: at(this.tStart),
-        caption: () => `Now why, one stage at a time. The card on the left shows both builds' code for the stage our message is in. Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L2 sits beside the core, L3 across the die, and DRAM out on the DIMMs.` },
+        caption: () => `Now why, one stage at a time. The card on the left shows both builds' code for the stage the featured message is in. Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L2 sits beside the core, L3 across the die, and DRAM out on the DIMMs.` },
       { id: 'out', sim: TX_NS, dilation: 1.2e8, onStart: at(tuned.done[hero]),
         caption: () => `Signal fired, risk passed, order encoded: <b>${order}</b>. It leaves the way the packet came in: across the die to the PCIe root complex, down the lanes to the network card and onto the wire, about 600 ns (a typical figure). Tick to trade, tuned: <b>${fmtNs(ttt(1))}</b>.` },
       { id: 'naive', sim: () => Math.max(1, naive.done[hero] + TX_NS - this.t), dilation: () => dil(naive.done[hero] + TX_NS - this.t, 11, 1e3, 2e9),
         onStart: at(tuned.done[hero] + TX_NS),
         caption: () => (naive.start[hero] - tl.heroArrive > 50
-          ? `In the real run it was worse than the race suggests. The naive core was still working through the burst that arrived before our packet, and only reached our message <b>${fmtNs(naive.start[hero] - tl.heroArrive)}</b> after it landed. Slow code doesn't just take longer: it falls behind, and then everything waits.`
+          ? `In the real run it was worse than the race suggests. The naive core was still working through the burst that arrived before this packet, and only reached the featured message <b>${fmtNs(naive.start[hero] - tl.heroArrive)}</b> after it landed. Slow code doesn't just take longer: it falls behind, and then everything waits.`
           : 'The naive core gets to the same message and makes the same decision, just later.') },
       { id: 'book', hold: 13, dilation: 1e8, onStart: () => { at(tuned.done[hero] + 1)(); this.markBook(); },
         caption: () => (this.story
-          ? `What was all that work for? This is the order book the Book stage keeps for ${tl.trace.heroSymbol}: every price level, bids in green on the left, asks in red on the right, bar height the shares waiting there, newest row at the front. Our message was a trade that emptied the best ${this.story.cleared.side === 'B' ? 'bid' : 'ask'} at <b>${price(this.story.cleared.price)}</b>. That is the signal: the price just moved, so we ${this.story.orderSide === 'B' ? 'buy' : 'sell'} at the new best, <b>${price(this.story.orderPrice)}</b>, before others react.`
+          ? `What was all that work for? This is the order book the Book stage keeps for ${tl.trace.heroSymbol}: every price level, bids in green on the left, asks in red on the right, bar height the shares waiting there, newest row at the front. The featured message was a trade that emptied the best ${this.story.cleared.side === 'B' ? 'bid' : 'ask'} at <b>${price(this.story.cleared.price)}</b>. That is the signal: the price just moved, so the strategy ${this.story.orderSide === 'B' ? 'buys' : 'sells'} at the new best, <b>${price(this.story.orderPrice)}</b>, before others react.`
           : `This is the order book the Book stage keeps for ${tl.trace.heroSymbol}: bids in green, asks in red, bar height the shares waiting at each price.`) },
       { id: 'verdict', hold: 9, dilation: 1e6, onStart: at(naive.done[hero] + TX_NS + 1),
         caption: () => `Same packet, same machine, same decision. Naive: <b>${fmtNs(ttt(0))}</b>. Tuned: <b>${fmtNs(ttt(1))}</b>, and the receipt below breaks down every nanosecond. Now it's yours: drag the timeline, change the slow motion, or follow the next order.` },
@@ -103,8 +103,8 @@ export class CoreAct extends Act {
     return wire + (ls.done[tl.hero] - tl.heroArrive) + TX_NS;
   }
 
-  // Replays the hero symbol's book up to our message to find what it did: which level it
-  // emptied, and so which side and price our order went out at.
+  // Replays the hero symbol's book up to the featured message to find what it did: which level it
+  // emptied, and so which side and price the strategy's order went out at.
   bookStory() {
     const tl = this.timeline;
     const book = tl.trace.book;
@@ -127,8 +127,8 @@ export class CoreAct extends Act {
   markBook() {
     if (!this.story) return;
     const s = this.story;
-    this.terrain.setMarker(0, s.cleared.price, `Emptied by our message<span class="ns">${price(s.cleared.price)}</span>`, 0xffffff);
-    this.terrain.setMarker(1, s.orderPrice, `Our order: ${s.orderSide === 'B' ? 'buy' : 'sell'}<span class="ns">${price(s.orderPrice)}</span>`, 0xffc44d);
+    this.terrain.setMarker(0, s.cleared.price, `Emptied by the featured message<span class="ns">${price(s.cleared.price)}</span>`, 0xffffff);
+    this.terrain.setMarker(1, s.orderPrice, `Strategy's order: ${s.orderSide === 'B' ? 'buy' : 'sell'}<span class="ns">${price(s.orderPrice)}</span>`, 0xffc44d);
   }
 
   buildControls() {
@@ -140,7 +140,7 @@ export class CoreAct extends Act {
       <div class="ctl-row"><label>Camera</label><div class="chips">
         <button class="chip" data-cam="follow">Follow</button><button class="chip" data-cam="overview">Overview</button>
         <button class="chip" data-cam="memory">Memory</button><button class="chip" data-cam="book">Order book</button></div></div>
-      <div class="ctl-row"><label>Jump to</label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Our message</button></div></div>
+      <div class="ctl-row"><label>Jump to</label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Featured message</button></div></div>
       <div class="ctl-row"><label>Panel</label><div class="chips"><button class="chip on" data-panel="code">Code</button><button class="chip" data-panel="numbers">Numbers</button></div></div>`;
     root.querySelectorAll('[data-lane]').forEach((b) => b.addEventListener('click', () => {
       const l = Number(b.dataset.lane);
@@ -243,7 +243,7 @@ export class CoreAct extends Act {
     g.beginPath();
     g.arc(x(tl.heroArrive), h / 2, 4, 0, Math.PI * 2);
     g.fill();
-    g.fillText('our packet', x(tl.heroArrive) + 6, h - 3);
+    g.fillText('featured packet', x(tl.heroArrive) + 6, h - 3);
     g.fillStyle = 'rgba(255,196,77,0.9)';
     g.fillText('orders', 4, h - 3);
   }
@@ -371,7 +371,7 @@ export class CoreAct extends Act {
     if (this.tpMode.textContent !== mode) this.tpMode.textContent = mode;
   }
 
-  // The code card follows our message through the stages: during the step-by-step beats in
+  // The code card follows the featured message through the stages: during the step-by-step beats in
   // the script, and in free play whenever the code panel is chosen with the follow camera.
   updateCode() {
     const id = this.mode === 'script' ? this.script.id : null;
@@ -424,7 +424,7 @@ export class CoreAct extends Act {
         look.set(...CAMERAS.overview.look);
       } else {
         const h = p.focusPos[lane];
-        // With the code card open on the left, frame our message right of centre.
+        // With the code card open on the left, frame the featured message right of centre.
         const side = this.code.visible ? 1 : 0;
         pos.set(h.x - 4 + side * 3, h.y + 9, h.z + 10);
         look.set(h.x + 2 - side * 6, h.y - 0.5, h.z - 1);
@@ -462,7 +462,7 @@ export class CoreAct extends Act {
     const waits = tl.lanes.map((ls) => fmtNs(ls.start[i] - tl.arrive[i]));
     this.inspector.innerHTML = `
       <div class="title"><span class="type">${TYPE_NAMES[type] || type} · ${sym}</span><span>#${i.toLocaleString()}</span></div>
-      <div style="color:var(--dim);margin-bottom:8px">packet ${pk.toLocaleString()} · ${i - tr.packetFirst[pk] + 1} of ${tr.packetCount[pk]}${i === tl.hero ? ' · our message' : ''}</div>
+      <div style="color:var(--dim);margin-bottom:8px">packet ${pk.toLocaleString()} · ${i - tr.packetFirst[pk] + 1} of ${tr.packetCount[pk]}${i === tl.hero ? ' · featured message' : ''}</div>
       <table><tr><th>stage</th><th class="n">naive</th><th></th><th class="t">tuned</th><th></th></tr>${rows}
       <tr><td>waited</td><td class="n">${waits[0]}</td><td></td><td class="t">${waits[1]}</td><td></td></tr>
       <tr><td>total</td><td class="n">${totals[0]}</td><td></td><td class="t">${totals[1]}</td><td></td></tr></table>`;

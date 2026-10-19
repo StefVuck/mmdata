@@ -60,7 +60,7 @@ export class BookTerrain {
     this.labels = [title, this.bidLabel, this.askLabel, now, past];
 
     // Price markers on the front row: a thin beam with a label, used to point at the level
-    // our message emptied and the price our order went out at.
+    // the featured message emptied and the price the strategy's order went out at.
     this.markers = [0, 1].map((k) => {
       const beam = new THREE.Mesh(new THREE.BoxGeometry(0.06, 7, 0.06), glow(0xffffff, 0.8));
       const l = label('', 'label marker', true);

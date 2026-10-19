@@ -98,7 +98,7 @@ export class FibreAct extends Act {
     spoolLabel.position.copy(this.coilCentre).add(new THREE.Vector3(0, 1.8, 0));
     s.add(spoolLabel);
 
-    const endLabel = label('To our switch', 'label cyan');
+    const endLabel = label('To the firm’s switch', 'label cyan');
     endLabel.position.copy(this.curve.getPointAt(1)).add(new THREE.Vector3(0, 0.6, 0));
     s.add(endLabel);
 
@@ -111,7 +111,7 @@ export class FibreAct extends Act {
     const ns = (m) => m * FIBRE_NS_PER_M;
     this.script = new Script([
       { id: 'tray', sim: ns(30), dilation: 3e7, snapDilation: true,
-        caption: 'Our cross-connect: 100 metres of single-mode fibre. Light in glass covers one metre every <b>4.9 nanoseconds</b>.' },
+        caption: 'The trading firm’s cross-connect: 100 metres of single-mode fibre. Light in glass covers one metre every <b>4.9 nanoseconds</b>.' },
       { id: 'coil', sim: ns(55), dilation: 2.4e7,
         caption: 'Exchanges give every firm the same length of cable, so a firm whose rack is close is handed a spool of extra fibre. Proximity buys nothing here.' },
       { id: 'exit', sim: ns(15), dilation: 3e7,

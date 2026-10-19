@@ -164,7 +164,7 @@ export class Hud {
   setDilation(d, held = false) {
     if (held) {
       this.dil.textContent = 'held';
-      this.dilSub.textContent = 'the clock is stopped while we look around';
+      this.dilSub.textContent = 'the clock is stopped for a look around';
       return;
     }
     this.dil.textContent = fmtDilation(d);

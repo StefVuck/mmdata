@@ -1,4 +1,4 @@
-// Figures for everything outside our software. These are typical published values, not
+// Figures for everything outside the trading software. These are typical published values, not
 // measurements, and the receipt marks them as such. Change them to match your own setup.
 export const FIBRE_NS_PER_M = 4.9;
 

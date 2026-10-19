@@ -8,7 +8,7 @@ const PORTS = 16;
 const PORT_X = (i) => -6.4 + (i * 12.8) / (PORTS - 1);
 const FRONT = 5;
 const IN_PORT = 0;
-const OUR_PORT = 11;
+const SERVER_PORT = 11;
 const SUBSCRIBERS = [2, 4, 5, 7, 9, 11, 13, 15];
 const GHOST_Y = 4.6;
 const SERVER_Y = -4.8;
@@ -44,8 +44,8 @@ export class SwitchAct extends Act {
     this.outPaths = SUBSCRIBERS.map((i) => portPath(i, 0, true));
     this.ghostIn = portPath(IN_PORT, GHOST_Y, false);
 
-    const portOut = new THREE.Vector3(PORT_X(OUR_PORT), 0.35, FRONT + 0.9);
-    this.nicPort = new THREE.Vector3(PORT_X(OUR_PORT) - 1.2, SERVER_Y + 0.35, FRONT + 0.9);
+    const portOut = new THREE.Vector3(PORT_X(SERVER_PORT), 0.35, FRONT + 0.9);
+    this.nicPort = new THREE.Vector3(PORT_X(SERVER_PORT) - 1.2, SERVER_Y + 0.35, FRONT + 0.9);
     this.patch = new THREE.CatmullRomCurve3([
       portOut,
       portOut.clone().add(new THREE.Vector3(0.3, -0.4, 1.4)),
@@ -70,7 +70,7 @@ export class SwitchAct extends Act {
     s.add(fromExchange);
 
     this.inComet = new Comet(0x9fe8ff, { radius: 0.07, length: 34 });
-    this.outComets = this.outPaths.map((_, k) => new Comet(SUBSCRIBERS[k] === OUR_PORT ? 0xbff4ff : 0x3f8cff, { radius: 0.06, length: 26 }));
+    this.outComets = this.outPaths.map((_, k) => new Comet(SUBSCRIBERS[k] === SERVER_PORT ? 0xbff4ff : 0x3f8cff, { radius: 0.06, length: 26 }));
     this.patchComet = new Comet(0xbff4ff, { radius: 0.07, length: 40 });
     this.ghostComet = new Comet(0x8fa4c8, { radius: 0.06, length: 22 });
     for (const c of [this.inComet, ...this.outComets, this.patchComet, this.ghostComet]) s.add(c.mesh);
@@ -83,11 +83,11 @@ export class SwitchAct extends Act {
     this.patchNs = WIRE.patchMetres * FIBRE_NS_PER_M;
     this.script = new Script([
       { id: 'intro', hold: 6,
-        caption: 'Our switch is a <em>layer 1</em> switch. It never reads the packet. It repeats the signal, electrically, to every port that subscribes.' },
+        caption: 'The firm’s switch is a <em>layer 1</em> switch. It never reads the packet. It repeats the signal, electrically, to every port that subscribes.' },
       { id: 'cross', sim: WIRE.switchNs, dilation: 1.2e9, snapDilation: true,
         caption: 'Five nanoseconds, port to port. The conventional switch above is still taking the frame into its buffer.' },
       { id: 'patch', sim: this.patchNs, dilation: 4e8,
-        caption: 'Three metres of patch cord to our server: another fifteen nanoseconds.' },
+        caption: 'Three metres of patch cord to the trading server: another fifteen nanoseconds.' },
       { id: 'arrive', hold: 1.2, caption: 'Into the network card.' },
     ]);
     this.v = new THREE.Vector3();
@@ -135,9 +135,9 @@ export class SwitchAct extends Act {
     box.position.set(0, SERVER_Y, 0);
     this.scene.add(box);
     const nic = wireBox(5, 0.5, 3.5, 0x3fffb0, 0.6, 0.03);
-    nic.position.set(PORT_X(OUR_PORT) - 1.2, SERVER_Y + 0.3, FRONT - 1.8);
+    nic.position.set(PORT_X(SERVER_PORT) - 1.2, SERVER_Y + 0.3, FRONT - 1.8);
     this.scene.add(nic);
-    const l = label('Our server · network card', 'label big tuned');
+    const l = label('Trading server · network card', 'label big tuned');
     l.position.set(-8.4, SERVER_Y + 1.3, FRONT);
     this.scene.add(l);
   }
@@ -160,8 +160,8 @@ export class SwitchAct extends Act {
     this.inComet.update(along(this.inPath, inP, 0.018), crossP >= 0 && crossP < pIn + 0.25);
     const outP = crossP < pIn ? -1 : (crossP - pIn) / (1 - pIn);
     this.outComets.forEach((c, k) => {
-      const ours = SUBSCRIBERS[k] === OUR_PORT;
-      c.update(along(this.outPaths[k], Math.min(1, outP), 0.022), outP >= 0 && (!ours || patchP <= 0.05));
+      const server = SUBSCRIBERS[k] === SERVER_PORT;
+      c.update(along(this.outPaths[k], Math.min(1, outP), 0.022), outP >= 0 && (!server || patchP <= 0.05));
     });
     this.patchComet.update(along(this.patch, patchP, 0.012), patchP > 0);
 

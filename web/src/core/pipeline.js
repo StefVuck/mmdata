@@ -270,7 +270,7 @@ export class Pipeline {
       m.count = 0;
       this.group.add(m);
     }
-    // One marker per core, so our message can be picked out on both.
+    // One marker per core, so the featured message can be picked out on both.
     this.halos = [0, 1].map((lane) => {
       const halo = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48), glow(LANE_COLORS[lane], 1, { side: THREE.DoubleSide }));
       halo.rotation.x = -Math.PI / 2;
@@ -566,7 +566,7 @@ export class Pipeline {
     });
     const type = String.fromCharCode(tl.trace.msgType[f]);
     const sym = tl.trace.symbols.get(tl.trace.msgLocate[f]) || '';
-    const what = f === tl.hero ? `Ours · ${type} · ${sym}` : `${type} · ${sym}`;
+    const what = f === tl.hero ? `Featured · ${type} · ${sym}` : `${type} · ${sym}`;
     this.halos.forEach((halo, lane) => {
       const text = `${what} · ${lane ? 'tuned' : 'naive'}`;
       const el = halo.userData.label.element;

@@ -296,3 +296,5 @@ body.has-transport #code { max-height: calc(100vh - 330px); }
   .tp-label, .tp-dil-val, .tp-hint { display: none; }
   .tp-dil { width: 70px; }
 }
+
+.disclaimer { margin-top: 22px; max-width: 620px; font-size: 12px; line-height: 1.55; color: var(--faint); border-top: 1px solid var(--line); padding-top: 14px; }

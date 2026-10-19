@@ -2,7 +2,7 @@
 """Cut a time window out of a full-day Nasdaq TotalView-ITCH 5.0 file.
 
 A raw window is not enough on its own: executions and cancels in it refer to orders added
-hours earlier. So we replay everything before the window to rebuild the live books, emit those
+hours earlier. So the slicer replays everything before the window to rebuild the live books, emit those
 live orders as Add Order messages just before the window opens, then copy the window verbatim.
 The result decodes into correct books from its first message.
 
@@ -54,7 +54,7 @@ def main():
     wanted = {s.strip().upper() for s in args.symbols.split(",") if s.strip()}
     opener = gzip.open if args.input.endswith(".gz") else open
 
-    keep = set()  # stock locates we keep
+    keep = set()  # stock locates kept
     orders = {}  # ref -> [locate, side, shares, price, stock8]
     header_msgs = []
     window = []

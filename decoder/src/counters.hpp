@@ -58,7 +58,7 @@ inline bool timer_is_coarse(double ticks_per_ns) { return ticks_per_ns < 0.5; }
 
 enum Counter { kL1dMiss, kLlcRef, kLlcMiss, kBranchMiss, kCounterCount };
 
-// The four counters we need to place a stall in the memory hierarchy:
+// The four counters needed to place a stall in the memory hierarchy:
 //   served by L2   = L1D misses - LLC references (an LLC reference is an L2 miss on Intel)
 //   served by L3   = LLC references - LLC misses
 //   served by DRAM = LLC misses

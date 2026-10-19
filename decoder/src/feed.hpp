@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-// The historical ITCH file is a stream of length-prefixed messages. We repackage it into
+// The historical ITCH file is a stream of length-prefixed messages. This tool repackages it into
 // MoldUDP64 packets, as it would arrive on the wire, so the decoder sees real framing.
 constexpr int kMoldHeader = 20;  // session[10] sequence[8] count[2]
 

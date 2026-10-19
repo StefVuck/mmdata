@@ -57,7 +57,7 @@ export class ExchangeAct extends Act {
       { id: 'engine', hold: 5, caption: 'Inside the <em>matching engine</em>, an incoming sell order meets a resting buy. <b>That is the trade.</b>' },
       { id: 'publish', sim: this.publishNs, dilation: 3.5e7, snapDilation: true,
         caption: 'The exchange publishes the execution as a multicast ITCH packet, to every subscriber at once.' },
-      { id: 'meetme', hold: 1.6, caption: 'At the meet-me room it is handed to our cross-connect. From here, every nanosecond is on our receipt.' },
+      { id: 'meetme', hold: 1.6, caption: 'At the meet-me room it is handed to the trading firm’s cross-connect. From here, every nanosecond goes on the receipt.' },
     ]);
     this.v = new THREE.Vector3();
     this.v2 = new THREE.Vector3();
@@ -185,7 +185,7 @@ export class ExchangeAct extends Act {
         this.scene.add(p);
       }
     }
-    const l = label('Meet-me room · our cross-connect', 'label big gold');
+    const l = label('Meet-me room · the firm’s cross-connect', 'label big gold');
     l.position.set(PORT.x, 3.2, 0);
     this.scene.add(l);
   }
@@ -263,7 +263,7 @@ export class ExchangeAct extends Act {
   get clockText() {
     const id = this.script.id;
     if (id === 'publish') return `${(this.script.beatSim).toFixed(0)} ns since publication`;
-    return 'exchange time · before our clock starts';
+    return 'exchange time · before the journey clock starts';
   }
 
   get stat() {

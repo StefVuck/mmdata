@@ -2,6 +2,13 @@
 // time dilation of `dilation`, or holds the clock still for `hold` wall seconds.
 // `sim` and `dilation` may be functions, resolved when the beat starts.
 
+const CHARS_PER_SECOND = 13;
+
+export function readingSeconds(html) {
+  if (!html) return 0;
+  return 4 + html.replace(/<[^>]*>/g, '').length / CHARS_PER_SECOND;
+}
+
 export class Script {
   constructor(beats, initialDilation = 1e8) {
     this.beats = beats;
@@ -49,6 +56,13 @@ export class Script {
     const val = (x) => (typeof x === 'function' ? x() : x);
     this.cur = { sim: val(b.sim), hold: val(b.hold), dilation: val(b.dilation) };
     this.cur.caption = val(b.caption);
+    // Every beat lasts at least as long as its caption takes to read. A held beat waits longer;
+    // a moving beat slows down rather than cutting the text short.
+    const read = readingSeconds(this.cur.caption);
+    if (this.cur.hold != null) this.cur.hold = Math.max(this.cur.hold, read);
+    else if (this.cur.sim > 0 && this.cur.dilation) {
+      this.cur.dilation = Math.max(this.cur.dilation, (read * 1e9) / this.cur.sim);
+    }
     if (b.snapDilation && this.cur.dilation) this.dilation = this.cur.dilation;
     this.started = true;
     if (b.onStart) b.onStart();
