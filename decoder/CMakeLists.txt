@@ -15,4 +15,13 @@ add_executable(mmdecode
   src/naive_lane.cpp
   src/tuned_lane.cpp
   src/trace.cpp)
-target_compile_options(mmdecode PRIVATE -Wall -Wextra -march=native)
+target_compile_options(mmdecode PRIVATE -Wall -Wextra)
+
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-march=native HAVE_MARCH_NATIVE)
+check_cxx_compiler_flag(-mcpu=native HAVE_MCPU_NATIVE)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i.86" AND HAVE_MARCH_NATIVE)
+  target_compile_options(mmdecode PRIVATE -march=native)
+elseif(HAVE_MCPU_NATIVE)
+  target_compile_options(mmdecode PRIVATE -mcpu=native)
+endif()

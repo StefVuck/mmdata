@@ -104,6 +104,12 @@ Everything outside our software (fibre, switch, network card, PCIe and the trans
 
 For the cleanest numbers, run on bare metal with the decoder pinned to an isolated core (`--cpu`), and set `kernel.perf_event_paranoid` to 2 or lower so user-space counters are allowed.
 
+### On a Mac with Apple Silicon
+
+The decoder builds and runs on Apple Silicon, with two differences. Hardware counters are Linux-only, so the viewer infers stalls from timing. And the only timer user code can read there, `cntvct_el0`, ticks at 24 MHz: about 42 ns a tick, longer than most tuned stages. So instead of keeping the fastest of three passes, `mmdecode` runs 25 passes (`--repeat` to change) and averages them. Each stage starts at a different point relative to the tick boundary on each pass, so the average converges on the true time even though every single reading is a whole number of ticks. Only clear outliers, such as interrupts, are dropped first. Against a simulated 24 MHz timer on x86, stage medians came out within a few nanoseconds of `rdtsc`, though individual readings for the shortest stages are noisier. `--average` forces this mode on any machine.
+
+For the trace you show on stage, an x86 Linux box with counters is still the better source.
+
 ## Deploying
 
 The viewer is a static site with relative paths, so it can be served from any host or subdirectory. `make web` writes it to `web/dist`, trace included; upload that folder to GitHub Pages, Netlify, Cloudflare Pages or any static host. Once it is live, put the link in the placeholder at the top of this file.

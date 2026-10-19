@@ -1,5 +1,8 @@
 #include "counters.hpp"
 
+#include <chrono>
+
+#if defined(__linux__)
 #include <linux/perf_event.h>
 #include <sched.h>
 #include <sys/ioctl.h>
@@ -8,8 +11,8 @@
 #include <unistd.h>
 
 #include <cerrno>
-#include <chrono>
 #include <cstring>
+#endif
 
 double calibrate_tsc_ghz() {
     using clock = std::chrono::steady_clock;
@@ -22,6 +25,8 @@ double calibrate_tsc_ghz() {
     const double ns = std::chrono::duration<double, std::nano>(w1 - w0).count();
     return double(t1 - t0) / ns;
 }
+
+#if defined(__linux__)
 
 namespace {
 
@@ -46,6 +51,7 @@ uint64_t read_mmap_counter(const perf_event_mmap_page* pc) {
         asm volatile("" ::: "memory");
         const uint32_t idx = pc->index;
         count = uint64_t(pc->offset);
+#if defined(__x86_64__) || defined(__i386__)
         if (pc->cap_user_rdpmc && idx) {
             const uint32_t width = pc->pmc_width;
             int64_t pmc = int64_t(__rdpmc(int(idx - 1)));
@@ -53,6 +59,9 @@ uint64_t read_mmap_counter(const perf_event_mmap_page* pc) {
             pmc >>= 64 - width;
             count += uint64_t(pmc);
         }
+#else
+        (void)idx;
+#endif
         asm volatile("" ::: "memory");
     } while (pc->lock != seq);
     return count;
@@ -100,12 +109,16 @@ bool PmcSet::open(const char** error) {
     ioctl(fds_[0], PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
     ioctl(fds_[0], PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP);
 
+#if defined(__x86_64__) || defined(__i386__)
     if (rdpmc_) {
         for (int i = 0; i < kCounterCount; ++i) {
             const auto* pc = static_cast<const perf_event_mmap_page*>(pages_[i]);
             if (!pc->cap_user_rdpmc) rdpmc_ = false;
         }
     }
+#else
+    rdpmc_ = false;
+#endif
     return true;
 }
 
@@ -129,3 +142,20 @@ bool pin_to_cpu(int cpu) {
     CPU_SET(cpu, &set);
     return sched_setaffinity(0, sizeof set, &set) == 0;
 }
+
+#else
+
+PmcSet::~PmcSet() = default;
+
+bool PmcSet::open(const char** error) {
+    *error = "hardware counters need Linux perf_event";
+    return false;
+}
+
+void PmcSet::read(uint64_t out[kCounterCount]) const {
+    for (int i = 0; i < kCounterCount; ++i) out[i] = 0;
+}
+
+bool pin_to_cpu(int) { return false; }
+
+#endif

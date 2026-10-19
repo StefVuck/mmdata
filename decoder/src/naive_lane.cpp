@@ -1,6 +1,7 @@
 #include "naive_lane.hpp"
 
 #include <cmath>
+#include <cstdlib>
 #include <stdexcept>
 
 uint64_t NaiveLane::read_be(size_t offset, size_t width) const {

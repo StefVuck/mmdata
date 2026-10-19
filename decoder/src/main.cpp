@@ -25,7 +25,8 @@ struct Options {
     size_t max_messages = 0;
     int cpu = -1;
     bool counters = true;
-    int repeat = 3;
+    int repeat = 0;
+    bool average = false;
     long hero_message = -1;
 };
 
@@ -33,7 +34,7 @@ void usage() {
     std::fprintf(stderr,
                  "usage: mmdecode --input FILE.itch [--out trace.bin] [--hero SYMBOL]\n"
                  "                [--hero-message INDEX] [--max-messages N] [--cpu N] [--repeat N]\n"
-                 "                [--no-counters]\n");
+                 "                [--average] [--no-counters]\n");
     std::exit(2);
 }
 
@@ -52,6 +53,7 @@ Options parse(int argc, char** argv) {
         else if (a == "--cpu") o.cpu = std::stoi(next());
         else if (a == "--repeat") o.repeat = std::max(1, std::stoi(next()));
         else if (a == "--hero-message") o.hero_message = std::stol(next());
+        else if (a == "--average") o.average = true;
         else if (a == "--no-counters") o.counters = false;
         else usage();
     }
@@ -68,6 +70,27 @@ uint32_t measure_probe_overhead() {
     }
     return uint32_t(best);
 }
+
+double measure_mean_overhead() {
+    const int n = 200000;
+    uint64_t sum = 0;
+    for (int i = 0; i < n; ++i) {
+        const uint64_t t0 = tsc_begin();
+        sum += tsc_end() - t0;
+    }
+    return double(sum) / n;
+}
+
+// In averaging mode, recorded ticks are picoseconds, so fractions of a coarse tick survive.
+constexpr double kPicosPerNs = 1000;
+
+struct Timing {
+    bool average;
+    int repeat;
+    uint32_t min_overhead;
+    double mean_overhead;
+    double ticks_per_ns;
+};
 
 uint16_t pick_hero(const Feed& feed, const std::string& wanted) {
     if (!wanted.empty()) {
@@ -154,22 +177,53 @@ std::vector<BookEvent> hero_book_events(const Feed& feed, uint16_t hero) {
     return out;
 }
 
-// Each pass starts from a fresh lane. Keeping the fastest of N passes per message and stage
-// removes interrupts and other noise that would otherwise read as stalls.
+// Each pass starts from a fresh lane. With a fine timer (rdtsc), the fastest of N passes per
+// message and stage removes interrupts and other noise that would otherwise read as stalls.
+// With a coarse one (Apple Silicon's 24 MHz counter), each reading is a whole number of ~42 ns
+// ticks, but where a stage starts relative to the tick boundary varies from pass to pass, so
+// the mean of many passes converges on the true time. Only clear outliers (an interrupt, a
+// page fault) are dropped first: trimming any more would bias short stages towards zero.
 template <class Lane, class... Args>
-Recording timed(const Feed& feed, int repeat, uint32_t overhead, Args... args) {
-    Recording best(feed.message_count());
-    std::fill(best.ticks.begin(), best.ticks.end(), ~0u);
-    for (int r = 0; r < repeat; ++r) {
+Recording timed(const Feed& feed, const Timing& tm, Args... args) {
+    const size_t cells = feed.message_count() * kStageCount;
+    Recording out(feed.message_count());
+    std::vector<uint32_t> passes;
+    if (tm.average) passes.resize(cells * size_t(tm.repeat));
+    else std::fill(out.ticks.begin(), out.ticks.end(), ~0u);
+
+    for (int r = 0; r < tm.repeat; ++r) {
         Lane lane(args...);
         Recording rec(feed.message_count());
         TscProbe probe;
-        probe.overhead = overhead;
+        probe.overhead = tm.average ? 0 : tm.min_overhead;
         run_lane(feed, lane, probe, rec);
-        for (size_t i = 0; i < rec.ticks.size(); ++i) best.ticks[i] = std::min(best.ticks[i], rec.ticks[i]);
-        best.outcome = rec.outcome;
+        if (tm.average) std::copy(rec.ticks.begin(), rec.ticks.end(), passes.begin() + long(r * cells));
+        else for (size_t i = 0; i < cells; ++i) out.ticks[i] = std::min(out.ticks[i], rec.ticks[i]);
+        out.outcome = rec.outcome;
     }
-    return best;
+
+    if (tm.average) {
+        std::vector<uint32_t> v(size_t(tm.repeat));
+        const uint32_t slack = uint32_t(std::ceil(2 + 20 * tm.ticks_per_ns));
+        for (size_t c = 0; c < cells; ++c) {
+            for (int r = 0; r < tm.repeat; ++r) v[size_t(r)] = passes[size_t(r) * cells + c];
+            std::nth_element(v.begin(), v.begin() + long(v.size() / 2), v.end());
+            const uint32_t limit = v[v.size() / 2] + slack;
+            uint64_t sum = 0, kept = 0;
+            for (uint32_t x : v) {
+                if (x > limit) continue;
+                sum += x;
+                ++kept;
+            }
+            if (sum == 0) {
+                out.ticks[c] = 0;
+                continue;
+            }
+            const double ns = (double(sum) / double(kept) - tm.mean_overhead) / tm.ticks_per_ns;
+            out.ticks[c] = ns > 0 ? uint32_t(std::lround(ns * kPicosPerNs)) : 0;
+        }
+    }
+    return out;
 }
 
 template <class Lane, class... Args>
@@ -241,7 +295,9 @@ void summarise(const char* name, const Recording& r, size_t messages, double ghz
         }
         std::printf("  %-8s %10.1f %10.1f %10.1f", stages[s], percentile(t, 0.5) / ghz, percentile(t, 0.99) / ghz,
                     t.empty() ? 0.0 : *std::max_element(t.begin(), t.end()) / ghz);
-        if (counters) std::printf(" %9lu %9lu %9lu %9lu", c[0], c[1], c[2], c[3]);
+        if (counters)
+            std::printf(" %9llu %9llu %9llu %9llu", (unsigned long long)c[0], (unsigned long long)c[1],
+                        (unsigned long long)c[2], (unsigned long long)c[3]);
         std::printf("\n");
     }
 }
@@ -262,12 +318,22 @@ int main(int argc, char** argv) {
     }
     std::printf("feed: %zu messages in %zu MoldUDP64 packets\n", n, feed.packets.size());
 
-    const double ghz = calibrate_tsc_ghz();
-    const uint32_t overhead = measure_probe_overhead();
-    std::printf("tsc: %.3f GHz, probe overhead %u ticks\n", ghz, overhead);
+    const double tick_ghz = calibrate_tsc_ghz();
+    const bool average = opt.average || timer_is_coarse(tick_ghz);
+    const Timing tm{average, opt.repeat > 0 ? opt.repeat : (average ? 25 : 3), measure_probe_overhead(),
+                    measure_mean_overhead(), tick_ghz};
+    // Recorded ticks per nanosecond: timer ticks normally, picoseconds when averaging.
+    const double ghz = average ? kPicosPerNs : tick_ghz;
+    std::printf("timer: %.3f ticks/ns (%.2f ns a tick), probe overhead %.2f ticks\n", tick_ghz, 1 / tick_ghz,
+                tm.mean_overhead);
+    if (average)
+        std::printf("timing: averaging %d passes per message%s\n", tm.repeat,
+                    timer_is_coarse(tick_ghz) ? ", since one tick is longer than most stages" : "");
+    else
+        std::printf("timing: fastest of %d passes per message\n", tm.repeat);
 
-    Recording naive = timed<NaiveLane>(feed, opt.repeat, overhead);
-    Recording tuned = timed<TunedLane>(feed, opt.repeat, overhead, size_t(22));
+    Recording naive = timed<NaiveLane>(feed, tm);
+    Recording tuned = timed<TunedLane>(feed, tm, size_t(22));
 
     uint32_t flags = 0;
     if (opt.counters) {
