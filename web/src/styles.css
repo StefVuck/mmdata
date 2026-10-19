@@ -430,3 +430,15 @@ body.act-code #receipt, body.act-code #caption { display: none; }
 .tcard .tn { position: absolute; left: 14px; top: 13px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--cyan); color: var(--cyan); font-size: 12px; display: grid; place-items: center; }
 #title-meta { margin: 18px 0 0; font-size: 11px; }
 @media (max-width: 760px) { .title-cards { grid-template-columns: 1fr; } }
+
+/* Act VI replay */
+.walk-replay-note { font-size: 11px; color: var(--faint); margin: -6px 0 12px; }
+.walk-col .title .run { font-family: var(--mono); text-transform: none; letter-spacing: 0; color: var(--ink); }
+.walk-col.finished .title .run { color: var(--gold); }
+.walk-col pre { position: relative; scroll-behavior: auto; }
+.walk-col .ln.ran { opacity: 0.55; }
+.walk-col .ln.exec { opacity: 1; background: rgba(255, 255, 255, 0.14); box-shadow: inset 3px 0 0 #fff; color: #fff; }
+.walk-col .ln.lit.exec { background: color-mix(in srgb, var(--lit) 42%, transparent); animation: stall 0.6s ease-in-out infinite alternate; }
+@keyframes stall { from { box-shadow: inset 3px 0 0 #fff; } to { box-shadow: inset 3px 0 0 #fff, 0 0 14px color-mix(in srgb, var(--lit) 60%, transparent); } }
+.walk-col .ann .cost .wait { position: absolute; left: 0; top: -1px; bottom: -1px; width: 0; background: #fff; opacity: 0.85; border-radius: 3px; z-index: 1; }
+.walk-col .ann .cost i { z-index: 0; }

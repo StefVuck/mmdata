@@ -58,7 +58,7 @@ A transport bar runs along the bottom: pause, a timeline covering the open throu
 
 ### VI. The code
 
-A reading section, one page per stage, with next and back controls. Each page explains in detail why one build hits cache and the other doesn't, shows both builds' code side by side, and marks every line that touches memory with the kind of access it makes (a pointer chase, a heap allocation, a single load into a flat table) and a bar for what that kind of access typically costs. Those per-line costs are typical figures, labelled as such; the measured numbers on each page are the stage's times for the featured message, the median and the slowest 1% across the trace.
+A reading section, one page per stage, with next and back controls. Each page explains in detail why one build hits cache and the other doesn't, shows both builds' code side by side, and marks every line that touches memory with the kind of access it makes (a pointer chase, a heap allocation, a single load into a flat table) and a bar for what that kind of access typically costs. Each page also replays both builds' code on a loop and on one clock: a playhead steps through the lines, stops on each marked line for that access's typical cost while its bar fills, and a running counter shows each build's time, so the slower build visibly falls behind. Those per-line costs, and the replay's timing, are typical figures, labelled as such; the measured numbers on each page are the stage's times for the featured message, the median and the slowest 1% across the trace.
 
 ## Running it
 

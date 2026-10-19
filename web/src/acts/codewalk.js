@@ -78,7 +78,7 @@ export class CodeWalkAct extends Act {
         ${this.statRow('Typical message (median)', nv.median, tu.median)}
         ${this.statRow('Slowest 1% of messages', nv.p99, tu.p99)}
         ${tr.counters ? `<tr><td>Share spent waiting on memory (counters)</td><td class="n">${Math.round(nv.waiting * 100)}%</td><td class="t">${Math.round(tu.waiting * 100)}%</td><td></td></tr>` : ''}
-      </table>${tr.timerNs > 2 ? `<div class="walk-warn">This trace was timed with a clock that ticks every ${tr.timerNs.toFixed(1)} ns, longer than most stages, so these numbers are approximate. The bundled trace was timed on x86.</div>` : ''}
+      </table><div class="walk-replay-note">The code below replays on a loop, the playhead pausing on each marked line for that access's typical cost. The replay's timing is illustrative; the table above is measured.</div>${tr.timerNs > 2 ? `<div class="walk-warn">This trace was timed with a clock that ticks every ${tr.timerNs.toFixed(1)} ns, longer than most stages, so these numbers are approximate. The bundled trace was timed on x86.</div>` : ''}
       <div class="walk-body">
         <div class="walk-prose">${page.body.map((p) => `<p>${p}</p>`).join('')}${this.legend()}</div>
         <div class="walk-code">
@@ -88,6 +88,7 @@ export class CodeWalkAct extends Act {
       </div>`;
     }
     this.root.innerHTML = html;
+    this.setupReplay();
     this.root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => this.go(Number(b.dataset.go))));
     this.root.querySelectorAll('[data-exit]').forEach((b) => b.addEventListener('click', () => this.leave(b.dataset.exit)));
   }
@@ -116,14 +117,74 @@ export class CodeWalkAct extends Act {
   column(title, cls, lines, notes) {
     const rows = lines.map((line) => {
       const a = notes.find((x) => x.match.test(line));
-      if (!a) return `<div class="ln">${hl(line)}</div>`;
+      const plain = /^\s*[{}]?\s*$/.test(line) ? 0.15 : 0.6;
+      if (!a) return `<div class="ln" data-cost="${plain}">${hl(line)}</div>`;
       const kind = ACCESS[a.kind];
       const lo = logPos(a.cost[0]), hi = logPos(a.cost[1]);
       const range = a.cost[0] === a.cost[1] ? `~${a.cost[0]} ns` : `${a.cost[0]} to ${a.cost[1]} ns`;
-      return `<div class="ln lit" style="--lit:${kind.color}">${hl(line)}</div>
-        <div class="ann" style="--lit:${kind.color}"><span class="cost"><i style="left:${lo * 100}%;width:${Math.max(2, (hi - lo) * 100)}%"></i></span><span class="what"><b>${kind.label}</b> · ${a.note} · ${range}</span></div>`;
+      const typical = Math.sqrt(a.cost[0] * a.cost[1]);
+      return `<div class="ln lit" data-cost="${typical}" data-kind="${kind.label}" style="--lit:${kind.color}">${hl(line)}</div>
+        <div class="ann" style="--lit:${kind.color}"><span class="cost"><b class="wait"></b><i style="left:${lo * 100}%;width:${Math.max(2, (hi - lo) * 100)}%"></i></span><span class="what"><b>${kind.label}</b> · ${a.note} · ${range}</span></div>`;
     }).join('');
-    return `<div class="walk-col ${cls}"><div class="title">${title}</div><pre>${rows}</pre></div>`;
+    return `<div class="walk-col ${cls}"><div class="title">${title}<span class="run"></span></div><pre>${rows}</pre></div>`;
+  }
+
+  // A replay of both columns on one clock: the playhead spends ~0.6 ns on a plain line and the
+  // typical cost on a marked one, so the slower build visibly falls behind. Illustrative timing.
+  setupReplay() {
+    this.replay = null;
+    const cols = [...this.root.querySelectorAll('.walk-col')];
+    if (!cols.length) return;
+    const lanes = cols.map((col) => {
+      const lines = [...col.querySelectorAll('.ln')];
+      const starts = [];
+      let t = 0;
+      for (const l of lines) {
+        starts.push(t);
+        t += Number(l.dataset.cost);
+      }
+      return { col, pre: col.querySelector('pre'), run: col.querySelector('.run'), lines, starts, total: t, cur: -1 };
+    });
+    const longest = Math.max(...lanes.map((l) => l.total));
+    // Scale so the slower build takes about seven seconds, whatever the stage.
+    this.replay = { lanes, t: 0, nsPerSec: longest / 7, end: longest };
+  }
+
+  stepReplay(dt) {
+    const r = this.replay;
+    if (!r || !this.root.isConnected) return;
+    r.t += dt * r.nsPerSec;
+    if (r.t > r.end + r.nsPerSec * 2) r.t = 0;
+    for (const lane of r.lanes) {
+      const t = Math.min(r.t, lane.total);
+      let k = lane.starts.length - 1;
+      while (k > 0 && lane.starts[k] > t) k--;
+      const done = r.t >= lane.total;
+      if (k !== lane.cur || done !== lane.done) {
+        if (lane.cur >= 0) lane.lines[lane.cur].classList.remove('exec');
+        lane.lines.forEach((l, j) => l.classList.toggle('ran', j < k || done));
+        if (!done) {
+          lane.lines[k].classList.add('exec');
+          const el = lane.lines[k];
+          lane.pre.scrollTop = Math.max(0, el.offsetTop - lane.pre.clientHeight / 2);
+        }
+        lane.cur = done ? -1 : k;
+        lane.done = done;
+      }
+      const el = lane.lines[k];
+      const ann = el.nextElementSibling && el.nextElementSibling.classList.contains('ann') ? el.nextElementSibling : null;
+      lane.lines.forEach((l) => {
+        const a = l.nextElementSibling;
+        if (a && a.classList.contains('ann') && a !== ann) a.querySelector('.wait').style.width = l.classList.contains('ran') ? '100%' : '0';
+      });
+      if (ann) {
+        const f = done ? 1 : (t - lane.starts[k]) / Number(el.dataset.cost);
+        ann.querySelector('.wait').style.width = `${Math.min(1, f) * 100}%`;
+      }
+      const waiting = !done && el.dataset.kind ? ` · waiting: ${el.dataset.kind}` : '';
+      lane.run.textContent = done ? ` · finished in ~${fmtNs(lane.total)}` : ` · ${fmtNs(t)}${waiting}`;
+      lane.col.classList.toggle('finished', done);
+    }
   }
 
   leave(where) {
@@ -156,6 +217,7 @@ export class CodeWalkAct extends Act {
 
   update(dt, wallDt = dt) {
     super.update(dt);
+    this.stepReplay(dt);
     const t = performance.now() / 4000;
     this.camera.position.set(Math.sin(t) * 3, Math.cos(t * 0.7) * 1.5, 20);
     this.camera.lookAt(0, 0, 0);
