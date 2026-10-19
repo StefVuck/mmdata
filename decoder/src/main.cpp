@@ -358,13 +358,18 @@ int main(int argc, char** argv) {
     if (average)
         std::printf("timing: averaging %d passes per message%s\n", tm.repeat,
                     timer_is_coarse(tick_ghz) ? ", since one tick is longer than most stages" : "");
+    if (timer_is_coarse(tick_ghz))
+        std::fprintf(stderr,
+                     "warning: this timer ticks every %.1f ns, longer than most stages. Treat the trace as\n"
+                     "approximate; the viewer will say so. For reliable numbers, use x86 Linux or the\n"
+                     "bundled trace (git checkout web/public/trace.bin).\n", 1 / tick_ghz);
     else
         std::printf("timing: fastest of %d passes per message\n", tm.repeat);
 
     Recording naive = timed<NaiveLane>(feed, tm);
     Recording tuned = timed<TunedLane>(feed, tm, size_t(22));
 
-    uint32_t flags = 0;
+    uint32_t flags = average ? uint32_t(kTimingAveraged) : 0u;
     if (opt.counters) {
         PmcSet pmc;
         const char* err = "";
@@ -402,7 +407,8 @@ int main(int argc, char** argv) {
     summarise("naive", naive, n, ghz, counters);
     summarise("tuned", tuned, n, ghz, counters);
 
-    TraceInput in{&feed, {&naive, &tuned}, {"naive", "tuned"}, std::move(book), flags, ghz, hero, hero_message, opt.ring_slots};
+    TraceInput in{&feed, {&naive, &tuned}, {"naive", "tuned"}, std::move(book), flags, ghz, hero, hero_message, opt.ring_slots,
+                  float(1 / tick_ghz)};
     write_trace(opt.output, in);
     std::printf("\nwrote %s\n", opt.output.c_str());
     return mismatches ? 3 : 0;

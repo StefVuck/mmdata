@@ -70,6 +70,17 @@ export class Director {
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
+  // Back to the title screen; Begin starts the loop again.
+  toTitle() {
+    if (this.act) this.act.exit();
+    this.current = -1;
+    this.transition = null;
+    this.paused = false;
+    this.renderer.setAnimationLoop(null);
+    document.getElementById('title').classList.remove('gone');
+    document.body.classList.add('intro');
+  }
+
   go(i, { portal = true } = {}) {
     if (i < 0 || i >= this.acts.length) return;
     if (portal) this.transition = { phase: 'out', t: 0, next: i };

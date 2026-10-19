@@ -16,7 +16,7 @@ struct BookEvent {
     uint32_t qty;
 };
 
-enum TraceFlags : uint32_t { kCountersMeasured = 1, kCountersRdpmc = 2 };
+enum TraceFlags : uint32_t { kCountersMeasured = 1, kCountersRdpmc = 2, kTimingAveraged = 4 };
 
 struct TraceInput {
     const Feed* feed;
@@ -28,6 +28,7 @@ struct TraceInput {
     uint16_t hero_locate;
     uint32_t hero_message;
     uint32_t ring_slots;
+    float timer_ns;  // one tick of the timer the stages were measured with
 };
 
 void write_trace(const std::string& path, const TraceInput& in);

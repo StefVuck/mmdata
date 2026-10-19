@@ -40,10 +40,11 @@ export class CodeWalkAct extends Act {
       const times = [];
       let wait = 0, total = 0;
       const stride = Math.max(1, Math.floor(ls.n / 6000));
+      // A stage counts if it ran: risk only when the signal fired, encode only for orders sent.
+      const ran = (i) => !ls.dropped[i] && (s < 4 || (s === 4 ? ls.outcome[i] >= 1 : ls.outcome[i] === 2));
       for (let i = 0; i < ls.n; i += stride) {
-        if (ls.dropped[i]) continue;
+        if (!ran(i)) continue;
         const d = ls.stageNs(i, s);
-        if (d <= 0) continue;
         times.push(d);
         total += d;
         for (const e of ls.stalls(i)[s]) wait += e.len;
@@ -61,20 +62,23 @@ export class CodeWalkAct extends Act {
   render(page) {
     const n = this.pages.indexOf(page);
     const stage = page.stage;
-    const nav = `<div class="walk-nav"><button class="chip" data-go="-1">← Back</button><span>${n + 1} / ${this.pages.length}</span><button class="chip primary-chip" data-go="1">Next →</button></div>`;
+    const last = n === this.pages.length - 1;
+    const nav = `<div class="walk-nav">${n > 0 ? '<button class="chip" data-go="-1">← Back</button>' : ''}<span>${n + 1} / ${this.pages.length}</span>${last
+      ? '<button class="chip" data-exit="title">Back to the title</button><button class="chip primary-chip" data-exit="explore">Explore the CPU →</button>'
+      : '<button class="chip primary-chip" data-go="1">Next →</button>'}<button class="chip ghost-chip" data-exit="title" title="Leave the walkthrough">✕</button></div>`;
     let html = `<div class="walk-head"><div class="eyebrow">${stage == null ? 'Act VI' : `Stage ${stage + 1} of 6`}</div><h2>${page.title}</h2>${nav}</div>`;
     if (stage == null) {
-      html += `<div class="walk-prose wide">${page.body.map((p) => `<p>${p}</p>`).join('')}${this.legend()}</div>`;
+      html += `<div class="walk-prose wide">${page.body.map((p) => `<p>${p}</p>`).join('')}${page.id === 'intro' ? this.legend() : ''}</div>`;
+      if (last) html += `<div class="walk-end"><button class="primary" data-exit="explore">Explore the CPU in free play</button><button data-exit="replay">Replay the journey from the exchange</button><button data-exit="title">Back to the title</button></div>`;
     } else {
       const [nv, tu] = this.stats[stage];
-
-      html += `<div class="walk-stats">
-        ${this.statCell('Featured message', nv.featured, tu.featured)}
-        ${this.statCell('Median across the trace', nv.median, tu.median)}
-        ${this.timeline.trace.counters
-          ? `<div class="stat"><div class="k">Time waiting on memory (from hardware counters)</div><div><span class="n">${Math.round(nv.waiting * 100)}%</span> <span class="t">${Math.round(tu.waiting * 100)}%</span></div></div>`
-          : this.statCell('Slowest 1% across the trace', nv.p99, tu.p99)}
-      </div>
+      const tr = this.timeline.trace;
+      html += `<table class="walk-stats"><tr><th>Measured time for this stage</th><th class="n">Naive</th><th class="t">Tuned</th><th>Tuned is</th></tr>
+        ${this.statRow('The featured message', nv.featured, tu.featured)}
+        ${this.statRow('Typical message (median)', nv.median, tu.median)}
+        ${this.statRow('Slowest 1% of messages', nv.p99, tu.p99)}
+        ${tr.counters ? `<tr><td>Share spent waiting on memory (counters)</td><td class="n">${Math.round(nv.waiting * 100)}%</td><td class="t">${Math.round(tu.waiting * 100)}%</td><td></td></tr>` : ''}
+      </table>${tr.timerNs > 2 ? `<div class="walk-warn">This trace was timed with a clock that ticks every ${tr.timerNs.toFixed(1)} ns, longer than most stages, so these numbers are approximate. The bundled trace was timed on x86.</div>` : ''}
       <div class="walk-body">
         <div class="walk-prose">${page.body.map((p) => `<p>${p}</p>`).join('')}${this.legend()}</div>
         <div class="walk-code">
@@ -85,16 +89,28 @@ export class CodeWalkAct extends Act {
     }
     this.root.innerHTML = html;
     this.root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => this.go(Number(b.dataset.go))));
+    this.root.querySelectorAll('[data-exit]').forEach((b) => b.addEventListener('click', () => this.leave(b.dataset.exit)));
   }
 
-  statCell(label, naive, tuned) {
-    return `<div class="stat"><div class="k">${label}</div><div><span class="n">${fmtNs(naive)}</span> <span class="t">${fmtNs(tuned)}</span></div></div>`;
+  statRow(label, naive, tuned) {
+    const f = (ns) => (ns < 1 ? 'under 1 ns' : fmtNs(ns));
+    const ratio = tuned >= 1 && naive >= 1 ? (naive / tuned >= 1.15 ? `${(naive / tuned).toFixed(1)}× faster` : 'about the same') : '';
+    return `<tr><td>${label}</td><td class="n">${f(naive)}</td><td class="t">${f(tuned)}</td><td class="r">${ratio}</td></tr>`;
   }
 
+  // The cost scale the per-line bars use: a log axis from 1 ns to 600 ns with each level of
+  // the memory hierarchy marked where it sits.
   legend() {
-    const ticks = [1, 4, 14, 90, 300].map((ns) => `<span style="left:${logPos(ns) * 100}%">${ns} ns</span>`).join('');
-    return `<div class="walk-legend"><div class="k">Typical cost of each marked line, log scale</div><div class="scale">${ticks}</div>
-      <div class="k">L1 ~1 ns · L2 ~4 ns · L3 ~14 ns · DRAM ~90 ns · heap allocation 20 to 60 ns</div></div>`;
+    const marks = [
+      { ns: 1, label: 'L1', note: '~1 ns', color: '#3fd8ff' },
+      { ns: 4, label: 'L2', note: '~4 ns', color: '#4f9dff' },
+      { ns: 14, label: 'L3', note: '~14 ns', color: '#8a6bff' },
+      { ns: 90, label: 'DRAM', note: '~90 ns', color: '#ff4fd8' },
+    ].map((m) => `<div class="mark" style="left:${logPos(m.ns) * 100}%;--c:${m.color}"><b>${m.label}</b><span>${m.note}</span></div>`).join('');
+    const alloc = `<div class="band" style="left:${logPos(20) * 100}%;width:${(logPos(60) - logPos(20)) * 100}%"><span>heap allocation, 20 to 60 ns</span></div>`;
+    const ticks = [1, 10, 100, 600].map((ns) => `<span style="left:${logPos(ns) * 100}%">${ns} ns</span>`).join('');
+    return `<div class="walk-legend"><div class="k">How to read the bars beside each marked line: typical cost of that kind of memory access, on a log scale</div>
+      <div class="axis">${alloc}${marks}<div class="line"></div><div class="ticks">${ticks}</div></div></div>`;
   }
 
   column(title, cls, lines, notes) {
@@ -108,6 +124,16 @@ export class CodeWalkAct extends Act {
         <div class="ann" style="--lit:${kind.color}"><span class="cost"><i style="left:${lo * 100}%;width:${Math.max(2, (hi - lo) * 100)}%"></i></span><span class="what"><b>${kind.label}</b> · ${a.note} · ${range}</span></div>`;
     }).join('');
     return `<div class="walk-col ${cls}"><div class="title">${title}</div><pre>${rows}</pre></div>`;
+  }
+
+  leave(where) {
+    const d = this.ctx.director;
+    if (where === 'title') d.toTitle();
+    else if (where === 'replay') d.go(0, { portal: false });
+    else {
+      d.go(4, { portal: false });
+      d.act.startFree();
+    }
   }
 
   go(step) {

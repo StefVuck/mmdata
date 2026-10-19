@@ -371,10 +371,6 @@ body.act-code #receipt, body.act-code #caption { display: none; }
 .walk-head h2 { margin: 4px 0 12px; font-weight: 300; font-size: 26px; flex: 1; }
 .walk-nav { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); }
 .primary-chip { background: var(--cyan); color: #00131c; border-color: transparent; }
-.walk-stats { display: flex; gap: 28px; margin-bottom: 16px; flex-wrap: wrap; }
-.walk-stats .stat .k { font-size: 11px; color: var(--dim); margin-bottom: 3px; }
-.walk-stats .stat div:last-child { font-family: var(--mono); font-size: 15px; }
-.walk-stats .n { color: var(--naive); } .walk-stats .t { color: var(--tuned); margin-left: 10px; }
 .walk-body { display: grid; grid-template-columns: minmax(260px, 1fr) 2.2fr; gap: 22px; }
 .walk-prose { font-size: 14px; line-height: 1.6; color: #c3d2ea; }
 .walk-prose.wide { max-width: 760px; font-size: 16px; }
@@ -395,7 +391,42 @@ body.act-code #receipt, body.act-code #caption { display: none; }
 .walk-col .ann .cost i { position: absolute; top: 0; bottom: 0; background: var(--lit); border-radius: 3px; }
 .walk-col .ann .what { font-size: 11px; color: #dbe6f7; }
 .walk-col .ann .what b { color: var(--lit); font-weight: 600; }
-.walk-legend { margin-top: 16px; font-size: 11px; color: var(--dim); }
-.walk-legend .scale { position: relative; height: 18px; margin: 6px 0; border-top: 1px solid var(--line); }
-.walk-legend .scale span { position: absolute; top: 3px; transform: translateX(-50%); font-family: var(--mono); font-size: 10px; }
 @media (max-width: 1100px) { .walk-body { grid-template-columns: 1fr; } }
+
+.walk-stats { border-collapse: collapse; margin: 0 0 14px; font-size: 13px; }
+.walk-stats th { text-align: left; font-weight: 400; font-size: 11px; color: var(--dim); padding: 0 18px 6px 0; }
+.walk-stats td { padding: 3px 18px 3px 0; color: #c3d2ea; }
+.walk-stats td.n, .walk-stats td.t { font-family: var(--mono); text-align: right; }
+.walk-stats th.n, .walk-stats td.n { color: var(--naive); }
+.walk-stats th.t, .walk-stats td.t { color: var(--tuned); }
+.walk-stats td.r { color: var(--ink); font-size: 12px; }
+.walk-warn { margin: -6px 0 14px; font-size: 12px; color: #ffb02e; }
+.ghost-chip { opacity: 0.7; }
+.walk-end { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.walk-end button { padding: 10px 18px; }
+
+.walk-legend { margin-top: 18px; font-size: 11px; color: var(--dim); }
+.walk-legend .axis { position: relative; height: 74px; margin: 10px 8px 0; }
+.walk-legend .line { position: absolute; left: 0; right: 0; top: 30px; height: 2px; background: linear-gradient(90deg, #3fd8ff, #4f9dff 22%, #8a6bff 41%, #ff4fd8 70%, #ff4fd8); border-radius: 1px; }
+.walk-legend .mark { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.walk-legend .mark b { color: var(--c); font-size: 11px; }
+.walk-legend .mark span { font-family: var(--mono); font-size: 10px; }
+.walk-legend .mark::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-top: 3px; }
+.walk-legend .band { position: absolute; top: 38px; height: 6px; background: rgba(255, 176, 46, 0.55); border-radius: 3px; }
+.walk-legend .band span { position: absolute; top: 8px; left: 0; white-space: nowrap; color: #ffb02e; font-size: 10px; }
+.walk-legend .ticks { position: absolute; left: 0; right: 0; top: 62px; }
+.walk-legend .ticks span { position: absolute; white-space: nowrap; transform: translateX(-50%); font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.walk-legend .ticks span:first-child { transform: none; }
+.walk-legend .ticks span:last-child { transform: translateX(-100%); }
+
+/* Title screen */
+.title-inner { max-width: 880px; }
+#title h1 { margin: 14px 0 16px; }
+.lede { max-width: 720px; }
+.title-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+.tcard { position: relative; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--line); border-radius: 12px; padding: 14px 14px 14px 46px; font-size: 13px; line-height: 1.5; color: #b7c6de; }
+.tcard b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 4px; }
+.tcard em { font-style: normal; color: var(--gold); font-family: var(--mono); }
+.tcard .tn { position: absolute; left: 14px; top: 13px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--cyan); color: var(--cyan); font-size: 12px; display: grid; place-items: center; }
+#title-meta { margin: 18px 0 0; font-size: 11px; }
+@media (max-width: 760px) { .title-cards { grid-template-columns: 1fr; } }

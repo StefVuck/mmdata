@@ -3,7 +3,7 @@ DECODE_FLAGS ?=
 
 .PHONY: all decoder trace web dev clean
 
-all: trace web
+all: decoder web
 
 decoder: build/mmdecode
 

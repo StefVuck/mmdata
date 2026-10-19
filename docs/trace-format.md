@@ -10,7 +10,7 @@
 | 8 | u32 | version, currently 1 |
 | 12 | u32 | lane count (2: naive, tuned) |
 | 16 | u32 | stage count (6: frame, decode, book, signal, risk, encode) |
-| 20 | u32 | flags: bit 0 counters measured, bit 1 counters read with `rdpmc` |
+| 20 | u32 | flags: bit 0 counters measured, bit 1 counters read with `rdpmc`, bit 2 stage times averaged over passes because the timer is coarse |
 | 24 | f64 | TSC frequency in GHz, used to turn ticks into nanoseconds |
 | 32 | u32 | message count *M* |
 | 36 | u32 | packet count *P* |
@@ -22,7 +22,8 @@
 | 64 | char[16] | lane 0 name |
 | 80 | char[16] | lane 1 name |
 | 96 | u32 | ring buffer size in packets, 0 for unbounded |
-| 100 | | reserved, zero |
+| 100 | f32 | nanoseconds per tick of the timer the stages were measured with |
+| 104 | | reserved, zero |
 
 ## Packets (*P* × 16 bytes)
 

@@ -26,15 +26,15 @@ async function boot() {
 
   const hero = timeline.hero;
   const type = String.fromCharCode(trace.msgType[hero]);
-  const [naive, tuned] = timeline.heroStats;
-  const total = (h) => h.queue + h.stages.reduce((a, b) => a + b, 0);
+  const core = director.acts[4];
+  document.getElementById('race-card').innerHTML = `Two builds of the same trading code on two cores. In this trace, tick to trade is <em>${fmtNs(core.tickToTrade(1))}</em> for the tuned build and <em>${fmtNs(core.tickToTrade(0))}</em> for the naive one.`;
   document.getElementById('title-meta').innerHTML = [
     trace.source === 'synthetic'
       ? 'Trace: illustrative, generated in the browser'
-      : `Trace: ${trace.messageCount.toLocaleString()} ITCH messages in ${trace.packetTotal.toLocaleString()} MoldUDP64 packets`,
-    `Featured packet: ${timeline.heroPacketCount} messages, carrying ${TYPE_NAMES[type] || type} on ${trace.heroSymbol}`,
-    `Software time for it: tuned ${fmtNs(total(tuned))}, naive ${fmtNs(total(naive))}`,
-  ].join('<br>');
+      : `Trace: ${trace.messageCount.toLocaleString()} synthetic ITCH messages around the 09:30 open`,
+    `Featured: an ${TYPE_NAMES[type] || type} message on ${trace.heroSymbol}`,
+    trace.timerNs > 2 ? `<span style="color:#ffb02e">Timed with a ${trace.timerNs.toFixed(1)} ns clock: numbers are approximate</span>` : '',
+  ].filter(Boolean).join(' · ');
 
   const title = document.getElementById('title');
   const begin = (act) => {
@@ -44,6 +44,7 @@ async function boot() {
   };
   document.getElementById('begin').addEventListener('click', () => begin(0));
   document.getElementById('skip').addEventListener('click', () => begin(4));
+  document.getElementById('code-btn').addEventListener('click', () => begin(5));
 
   if (params.has('act')) {
     begin(Number(params.get('act')) - 1);

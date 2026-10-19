@@ -42,14 +42,20 @@
 
     <div id="title">
       <div class="title-inner">
-        <div class="eyebrow">One packet, slowed down a billion times</div>
+        <div class="eyebrow">An interactive explainer of low-latency trading systems</div>
         <h1>Microsecond<br />in Slow Motion</h1>
-        <p class="lede">Follow a single Nasdaq ITCH packet from the matching engine, down the fibre, through the switch and the network card, into a CPU core, and out again as an order.</p>
-        <div id="title-meta"></div>
-        <div class="title-buttons">
-          <button id="begin" class="primary">Begin the journey</button>
-          <button id="skip">Go straight to the core</button>
+        <p class="lede">Where do the microseconds go between a trade on an exchange and an order coming back? Follow one market data packet through every piece of hardware and software it touches, slowed down until a single cache miss takes seconds.</p>
+        <div class="title-cards">
+          <div class="tcard"><div class="tn">1</div><b>The journey</b><span>Exchange, fibre, switch, network card and CPU, each drawn to scale, with a running nanosecond receipt.</span></div>
+          <div class="tcard"><div class="tn">2</div><b>The race</b><span id="race-card">Two builds of the same trading code on two cores, measured stage by stage.</span></div>
+          <div class="tcard"><div class="tn">3</div><b>The why</b><span>Cache misses drawn as trips across the motherboard, packets dropped in a burst, and the code behind it, line by line.</span></div>
         </div>
+        <div class="title-buttons">
+          <button id="begin" class="primary">Start the tour</button>
+          <button id="skip">Jump to the CPU</button>
+          <button id="code-btn">Read the code</button>
+        </div>
+        <div id="title-meta"></div>
         <div class="keys">Space pause · ← → change act · 1 to 6 jump to an act · H hide overlay · F follow · R replay</div>
         <p class="disclaimer">A toy example written by an AI assistant, for learning about low-latency systems. It is not related to, derived from or representative of any employer's code, systems or trading practices. The trading logic is deliberately simplistic, and the bundled market data is synthetic.</p>
       </div>

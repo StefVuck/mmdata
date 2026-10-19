@@ -65,11 +65,11 @@ A reading section, one page per stage, with next and back controls. Each page ex
 You need a C++17 compiler, CMake, Python 3 and Node 20.19 or later.
 
 ```sh
-make            # builds the decoder, generates synthetic ITCH, writes web/public/trace.bin, builds the site
+make            # builds the decoder and the site, using the bundled trace
 make dev        # serves the viewer at http://localhost:5173
 ```
 
-A trace from the synthetic feed is committed in `web/public/trace.bin`, so `cd web && npm install && npx vite` is enough to watch it without building anything.
+A trace from the synthetic feed, timed on x86 Linux, is committed in `web/public/trace.bin`, so `cd web && npm install && npx vite` is enough to watch it without building anything. `make` leaves that trace alone; run `make trace` to replace it with one timed on your own machine. On a machine with a coarse timer, such as Apple Silicon, the result is approximate and the viewer says so; `git checkout web/public/trace.bin` restores the bundled one.
 
 | Control | What it does |
 |---|---|
