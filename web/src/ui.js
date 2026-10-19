@@ -1,0 +1,189 @@
+import { WIRE, FIBRE_NS_PER_M, STAGES, STAGE_TITLES, LANE_TITLES } from './journey.js';
+import { fmtNs, fmtDilation } from './fx.js';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+export const ACTS = [
+  { n: 'I', title: 'The exchange' },
+  { n: 'II', title: 'The fibre' },
+  { n: 'III', title: 'The switch' },
+  { n: 'IV', title: 'The network card' },
+  { n: 'V', title: 'The core' },
+];
+
+export class Receipt {
+  constructor(root, timeline) {
+    this.root = root;
+    this.timeline = timeline;
+    const wire = (id, label, ns) => ({ id, label, ns, typical: true });
+    this.shared = [
+      wire('fibre', 'Fibre', WIRE.fibreMetres * FIBRE_NS_PER_M),
+      wire('switch', 'L1 switch', WIRE.switchNs),
+      wire('patch', 'Patch', WIRE.patchMetres * FIBRE_NS_PER_M),
+      wire('phy', 'Optic + MAC', WIRE.opticPhyNs + WIRE.macNs),
+      wire('pcie', 'PCIe DMA', WIRE.pcieNs),
+      wire('poll', 'Poll', WIRE.pollNs),
+    ];
+    this.rows = timeline.heroStats.map((h, lane) => {
+      const segs = this.shared.map((s) => ({ ...s }));
+      segs.push({ id: 'queue', label: 'Queue', ns: h.queue, queue: true });
+      STAGES.forEach((id, s) => {
+        if (h.stages[s] > 0) segs.push({ id, label: STAGE_TITLES[s], ns: h.stages[s], measured: true });
+      });
+      segs.push({ id: 'tx', label: 'Tx to wire', ns: WIRE.txNs, typical: true });
+      return { lane, segs, fill: new Map() };
+    });
+    this.build();
+  }
+
+  build() {
+    this.root.innerHTML = '';
+    const max = Math.max(...this.rows.map((r) => r.segs.reduce((a, s) => a + s.ns, 0)));
+    // Small segments get a minimum width so they stay legible; the numbers carry the truth.
+    for (const row of [...this.rows].reverse()) {
+      const line = el('div', `receipt-row lane-${row.lane}`);
+      line.append(el('div', `receipt-lane lane-${row.lane}`, LANE_TITLES[row.lane]));
+      const bar = el('div', 'receipt-bar');
+      row.els = new Map();
+      for (const s of row.segs) {
+        const seg = el('div', `seg ${s.typical ? 'typical' : ''} ${s.queue ? 'queue' : ''} ${s.measured ? 'measured' : ''}`);
+        seg.style.flexGrow = String(Math.max(s.ns / max, 0.018));
+        const fill = el('div', 'seg-fill');
+        const txt = el('div', 'seg-text');
+        txt.append(el('span', 'seg-name', s.label), el('span', 'seg-ns', fmtNs(s.ns)));
+        seg.append(fill, txt);
+        seg.title = `${s.label}: ${fmtNs(s.ns)}${s.typical ? ' (typical figure)' : s.measured ? ' (measured)' : ' (from schedule)'}`;
+        bar.append(seg);
+        row.els.set(s.id, { seg, fill });
+      }
+      line.append(bar);
+      const total = el('div', 'receipt-total', '0 ns');
+      row.totalEl = total;
+      line.append(total);
+      this.root.append(line);
+    }
+    const legend = el('div', 'receipt-legend');
+    const measured = this.timeline.trace.source === 'synthetic' ? 'illustrative software time' : 'measured by mmdecode';
+    legend.innerHTML = `<span class="key typical"></span>typical figure <span class="key measured"></span>${measured} <span class="key queue"></span>waiting behind earlier messages`;
+    this.root.append(legend);
+  }
+
+  set(id, fraction, lane = null) {
+    for (const row of this.rows) {
+      if (lane != null && row.lane !== lane) continue;
+      const e = row.els.get(id);
+      if (!e) continue;
+      const f = Math.max(0, Math.min(1, fraction));
+      row.fill.set(id, f);
+      e.fill.style.width = `${f * 100}%`;
+      e.seg.classList.toggle('active', f > 0 && f < 1);
+    }
+    this.updateTotals();
+  }
+
+  fillThrough(id, lane = null) {
+    for (const row of this.rows) {
+      if (lane != null && row.lane !== lane) continue;
+      for (const s of row.segs) {
+        this.set(s.id, 1, row.lane);
+        if (s.id === id) break;
+      }
+    }
+  }
+
+  clear() {
+    for (const row of this.rows) for (const s of row.segs) this.set(s.id, 0, row.lane);
+  }
+
+  updateTotals() {
+    for (const row of this.rows) {
+      let t = 0;
+      for (const s of row.segs) t += s.ns * (row.fill.get(s.id) || 0);
+      row.totalEl.textContent = fmtNs(t);
+    }
+  }
+
+  total(lane) {
+    return this.rows[lane].segs.reduce((a, s) => a + s.ns, 0);
+  }
+}
+
+export class Hud {
+  constructor(timeline) {
+    this.timeline = timeline;
+    this.root = $('#hud');
+    this.actTitle = $('#act-title');
+    this.actNum = $('#act-num');
+    this.dil = $('#dilation');
+    this.dilSub = $('#dilation-sub');
+    this.clockEl = $('#clock');
+    this.stat = $('#stat');
+    this.caption = $('#caption');
+    this.nav = $('#act-nav');
+    this.badge = $('#badge');
+    this.receipt = new Receipt($('#receipt'), timeline);
+    this.captionText = null;
+    this.onJump = null;
+
+    ACTS.forEach((a, i) => {
+      const b = el('button', 'nav-dot');
+      b.innerHTML = `<span class="nav-n">${a.n}</span><span class="nav-t">${a.title}</span>`;
+      b.addEventListener('click', () => this.onJump && this.onJump(i));
+      this.nav.append(b);
+    });
+
+    const t = timeline.trace;
+    const bits = [];
+    if (t.source === 'synthetic') bits.push('Illustrative trace generated in the browser');
+    else bits.push(`Trace from mmdecode · ${t.messageCount.toLocaleString()} messages`);
+    bits.push(t.counters ? (t.source === 'synthetic' ? 'counters illustrative' : `counters measured via ${t.rdpmc ? 'rdpmc' : 'read()'}`) : 'stalls inferred from timing');
+    this.badge.textContent = bits.join(' · ');
+  }
+
+  setAct(i) {
+    this.actNum.textContent = ACTS[i].n;
+    this.actTitle.textContent = ACTS[i].title;
+    [...this.nav.children].forEach((c, k) => {
+      c.classList.toggle('current', k === i);
+      c.classList.toggle('past', k < i);
+    });
+  }
+
+  setDilation(d, held = false) {
+    if (held) {
+      this.dil.textContent = 'held';
+      this.dilSub.textContent = 'the clock is stopped while we look around';
+      return;
+    }
+    this.dil.textContent = fmtDilation(d);
+    this.dilSub.textContent = d < 1.5 ? 'real time' : `1 second on screen = ${fmtNs(1e9 / d)}`;
+  }
+
+  setClock(text) {
+    this.clockEl.textContent = text || '';
+  }
+
+  setStat(html) {
+    if (this.statHtml === html) return;
+    this.statHtml = html;
+    this.stat.innerHTML = html || '';
+  }
+
+  setCaption(text) {
+    if (text === this.captionText) return;
+    this.captionText = text;
+    this.caption.classList.remove('show');
+    clearTimeout(this.captionTimer);
+    this.captionTimer = setTimeout(() => {
+      this.caption.innerHTML = text || '';
+      if (text) this.caption.classList.add('show');
+    }, 220);
+  }
+}

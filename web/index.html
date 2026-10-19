@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Microsecond in Slow Motion</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="intro">
+    <div id="stage"></div>
+    <div id="labels"></div>
+    <div id="whiteout"></div>
+
+    <div id="hud">
+      <div id="brand">
+        <div class="eyebrow">Microsecond in Slow Motion</div>
+        <div class="act-line"><span id="act-num"></span><span id="act-title"></span></div>
+      </div>
+
+      <nav id="act-nav"></nav>
+
+      <div id="readout">
+        <div id="dilation"></div>
+        <div id="dilation-sub"></div>
+        <div id="clock"></div>
+        <div id="stat"></div>
+        <div id="badge"></div>
+      </div>
+
+      <div id="caption"></div>
+      <div id="receipt"></div>
+      <div id="controls" hidden></div>
+      <div id="inspector" hidden></div>
+    </div>
+
+    <div id="title">
+      <div class="title-inner">
+        <div class="eyebrow">One packet, slowed down a billion times</div>
+        <h1>Microsecond<br />in Slow Motion</h1>
+        <p class="lede">Follow a single Nasdaq ITCH packet from the matching engine, down the fibre, through the switch and the network card, into a CPU core, and out again as an order.</p>
+        <div id="title-meta"></div>
+        <div class="title-buttons">
+          <button id="begin" class="primary">Begin the journey</button>
+          <button id="skip">Go straight to the core</button>
+        </div>
+        <div class="keys">Space pause · ← → change act · H hide overlay · F follow · R replay</div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
