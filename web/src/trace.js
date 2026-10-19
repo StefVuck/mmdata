@@ -24,6 +24,7 @@ export function parseTrace(buf) {
   const heroLocate = dv.getUint16(56, true);
   const symbolCount = dv.getUint32(60, true);
   const laneNames = [ascii(dv, 64, 16), ascii(dv, 80, 16)].slice(0, laneCount);
+  const ringSlots = dv.getUint32(96, true);
 
   let off = 128;
   const packetArrival = new Float64Array(nPackets);
@@ -101,6 +102,7 @@ export function parseTrace(buf) {
     heroMessage: heroMessage === 0xffffffff ? -1 : heroMessage,
     heroSymbol,
     heroLocate,
+    ringSlots,
   };
 }
 

@@ -63,6 +63,7 @@ class Generator:
         self.next_ref = 1000
         self.scale = scale
         self.books = []
+        self.surging = False
         weights = [1.0 / (i + 1) ** 0.9 for i in range(len(SYMBOLS))]
         total = sum(weights)
         self.cum = []
@@ -70,6 +71,11 @@ class Generator:
         for wgt in weights:
             acc += wgt / total
             self.cum.append(acc)
+
+    # Gaps between messages inside a burst; during the opening surge they tighten.
+    def gap(self, lo, hi):
+        g = self.rng.randint(lo, hi)
+        return max(1, int(g * 0.12)) if self.surging else g
 
     def ref(self):
         self.next_ref += self.rng.randint(1, 4)
@@ -134,12 +140,12 @@ class Generator:
                 worst = b.prices(side)[-1] if b.levels[side] else (b.mid if side == "B" else b.mid)
                 price = worst - 1 if side == "B" else worst + 1
                 self.add(b, side, price, ts)
-                ts += self.rng.randint(30, 120)
+                ts += self.gap(30, 120)
         return ts
 
     def quote_refresh(self, b, ts):
         for _ in range(self.rng.randint(1, 6)):
-            ts += self.rng.randint(20, 250)
+            ts += self.gap(20, 250)
             side = self.rng.choice("BS")
             refs = [r for r, (s, _) in b.orders.items() if s == side]
             roll = self.rng.random()
@@ -181,7 +187,7 @@ class Generator:
             self.w.emit(header("E", b.locate, ts) + struct.pack(">QIQ", ref, take, match))
             self.remove_shares(b, ref, take)
             want -= take
-            ts += self.rng.randint(5, 40)
+            ts += self.gap(5, 40)
         if b.levels["B"] and b.levels["S"]:
             b.mid = (b.best("B") + b.best("S")) // 2
         return self.refill(b, ts)
@@ -198,7 +204,9 @@ class Generator:
         t = t_ns / 1e9
         if t < 0:
             return 20_000 * self.scale
-        return (40_000 + 220_000 * math.exp(-t / 0.05)) * self.scale
+        # The opening cross and the first moments of continuous trading arrive as a surge.
+        surge = 2_600_000 if t < 0.003 else 0
+        return (40_000 + 220_000 * math.exp(-t / 0.05) + surge) * self.scale
 
     def run(self, pre_ms, post_ms):
         rng = self.rng
@@ -224,6 +232,7 @@ class Generator:
             if not opened and t >= OPEN_NS:
                 self.system("Q", OPEN_NS)
                 opened = True
+            self.surging = 0 <= t - OPEN_NS < 3_000_000
             b = self.books[bisect.bisect_left(self.cum, rng.random())]
             roll = rng.random()
             if roll < 0.5:
@@ -234,7 +243,7 @@ class Generator:
             elif roll < 0.86 or t < OPEN_NS:
                 t = self.refill(b, t)
                 for _ in range(rng.randint(1, 3)):
-                    t += rng.randint(20, 200)
+                    t += self.gap(20, 200)
                     self.add(b, rng.choice("BS"), self.near_touch_price(b, rng.choice("BS")), t)
             elif roll < 0.97:
                 t = self.sweep(b, t)

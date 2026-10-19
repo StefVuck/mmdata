@@ -74,7 +74,7 @@ function build(src, cls, fns) {
   return fns.map((fn) => extract(src, cls, fn)).join('\n\n').split('\n');
 }
 
-const SOURCES = STAGES.map((s) => ({
+export const SOURCES = STAGES.map((s) => ({
   naive: build(naiveSrc, 'NaiveLane', s.naive.fns),
   tuned: build(tunedSrc, 'TunedLane', s.tuned.fns),
 }));

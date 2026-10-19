@@ -52,6 +52,8 @@ function colorFor(code) {
   return c;
 }
 const GOLD = new THREE.Color(0xffc44d);
+const GREY = new THREE.Color(0x6f7d92);
+const RED = new THREE.Color(0xff3b4f);
 const WHITE = new THREE.Color(0xffffff);
 const LEVEL_COLORS = LEVELS.map((l) => new THREE.Color(l.color));
 
@@ -190,7 +192,7 @@ export class Pipeline {
         .element.style.color = '#4f9dff';
       this.addLabel('L1d<span class="ns">~1 ns</span>', 'label level', 4.6, 0.9, zc + side * 1.0, [0, 0.5])
         .element.style.color = '#3fd8ff';
-      const q = this.addLabel('', `label ${lane ? 'tuned' : 'naive'}`, QUEUE_X, 1.3, side * 1.0, [1, 0.5]);
+      const q = this.addLabel('', `label ring ${lane ? 'tuned' : 'naive'}`, ROOT.x - 2.5, 1.3, side * 4, [1, 0.5]);
       this.stations[lane].queueLabel = q;
     });
 
@@ -262,7 +264,8 @@ export class Pipeline {
     this.heads = new THREE.InstancedMesh(head, glow(0xffffff, 1), MAX_HEADS);
     this.segs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), glow(0xffffff, 0.9), MAX_SEGS);
     this.fetch = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), glow(0xffffff, 0.5), MAX_FETCH);
-    for (const m of [this.heads, this.segs, this.fetch]) {
+    this.orders = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.32, 0), glow(0xffffff, 1), 400);
+    for (const m of [this.heads, this.segs, this.fetch, this.orders]) {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.setColorAt(0, WHITE);
       m.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -304,6 +307,7 @@ export class Pipeline {
     const zc = CORE_Z[lane];
     st.hidden = false;
     st.brightness = 1;
+    st.scale = 1;
     st.away = false;
     switch (st.phase) {
       case PHASE_NONE:
@@ -311,6 +315,8 @@ export class Pipeline {
       case PHASE_QUEUED: {
         const k = Math.min(st.ahead, QUEUE_SHOWN);
         out.set(QUEUE_X + k * QUEUE_STEP, TRACK_Y, SIDE[lane] * (0.8 + (i % 3) * 0.2));
+        st.scale = 0.6;
+        st.brightness = 0.55;
         return true;
       }
       case PHASE_STAGE: {
@@ -343,9 +349,11 @@ export class Pipeline {
         return true;
       }
       case PHASE_SINK: {
+        // Finished with nothing to do: shrinks to a grey dot where it ended and fades out.
         const x0 = stageX(st.lastStage) + STAGE_W;
-        out.set(x0 + 0.2 + st.u * 0.5, TRACK_Y + st.u * st.u * 2.5, zc);
-        st.brightness = 1 - st.u;
+        out.set(x0 + 0.3, TRACK_Y, zc);
+        st.brightness = 0.8 * (1 - st.u);
+        st.scale = 0.55 * (1 - st.u) + 0.15;
         return true;
       }
       case PHASE_TX: {
@@ -375,7 +383,7 @@ export class Pipeline {
   // laneOffset shifts one core's clock against the other, to replay them side by side.
   update(tIn, trailNs, wallTime) {
     const tl = this.timeline;
-    let nh = 0, ns = 0, nf = 0;
+    let nh = 0, ns = 0, nf = 0, no = 0;
     const heads = this.heads, segs = this.segs, fetch = this.fetch;
     const p = this.p, q = this.q, c = this.c;
     let sentTotal = 0;
@@ -448,11 +456,22 @@ export class Pipeline {
           const ok = this.place(ls, lane, i, ts, q);
           const st = this.st;
           if (ok && k === 0 && alive) {
-            if (!st.hidden && nh < MAX_HEADS) {
-              const sc = isFocus ? 1.5 : 1;
+            if (st.phase === PHASE_TX) {
+              if (no < 400) {
+                this.m.makeRotationY(wallTime * 3).setPosition(q);
+                this.m.scale(this.scale.setScalar(isFocus ? 1.4 : 1));
+                this.orders.setMatrixAt(no, this.m);
+                this.orders.setColorAt(no++, c.copy(GOLD).multiplyScalar(1.6 * st.brightness));
+              }
+            } else if (!st.hidden && nh < MAX_HEADS) {
+              const sc = (isFocus ? 1.5 : 1) * st.scale;
               this.m.makeScale(sc, sc, sc).setPosition(q);
               heads.setMatrixAt(nh, this.m);
-              c.copy(isFocus ? WHITE : base).multiplyScalar((isFocus ? 1.6 : 1.4) * st.brightness);
+              if (isFocus) c.copy(WHITE);
+              else if (st.phase === PHASE_SINK) c.copy(GREY);
+              else if (st.phase === PHASE_QUEUED) c.copy(base).lerp(GREY, 0.5);
+              else c.copy(base);
+              c.multiplyScalar((isFocus ? 1.6 : 1.4) * st.brightness);
               heads.setColorAt(nh++, c);
             }
             if (isFocus) {
@@ -499,9 +518,38 @@ export class Pipeline {
       }
       if (this.focus > visibleQueueEnd && this.focus <= hi) draw(this.focus);
 
+      // Dropped packets fall off the ring buffer in red.
+      if (ls.slots) {
+        const show = Math.max(trailNs, 60);
+        let a = 0, b = tl.arrive.length;
+        while (a < b) { const mid = (a + b) >> 1; if (tl.arrive[mid] < t - show) a = mid + 1; else b = mid; }
+        let drawn = 0;
+        for (let i = a; i <= hi && drawn < 300; i++) {
+          if (!ls.dropped[i]) continue;
+          const u = (t - tl.arrive[i]) / show;
+          q.set(QUEUE_X - 0.6 - u * 2.5 - (i % 5) * 0.15, TRACK_Y + 0.4 - u * u * 6, SIDE[lane] * (1.2 + (i % 3) * 0.3));
+          const sc = 0.8 * (1 - u * 0.5);
+          this.m.makeScale(sc, sc, sc).setPosition(q);
+          if (nh < MAX_HEADS) {
+            heads.setMatrixAt(nh, this.m);
+            heads.setColorAt(nh++, c.copy(RED).multiplyScalar(1.8 * (1 - u)));
+          }
+          drawn++;
+        }
+      }
+
       const st = this.stations[lane];
-      const qText = queued > 0 ? `queue ${queued.toLocaleString()}` : '';
-      if (st.queueLabel.element.textContent !== qText) st.queueLabel.element.textContent = qText;
+      const depth = ls.slots ? ls.ringDepth(t) : queued;
+      const lost = ls.slots ? ls.droppedBy(t) : { packets: 0, messages: 0 };
+      const fill = ls.slots ? Math.min(1, depth / ls.slots) : 0;
+      const qHtml = ls.slots
+        ? `Ring buffer ${depth.toLocaleString()} / ${ls.slots.toLocaleString()} packets<div class="meter${fill >= 1 ? ' full' : ''}"><i style="width:${(fill * 100).toFixed(1)}%"></i></div>`
+          + (lost.packets ? `<span class="dropped">dropped ${lost.packets.toLocaleString()} packets · ${lost.messages.toLocaleString()} messages</span>` : '')
+        : (queued > 0 ? `queue ${queued.toLocaleString()}` : '');
+      if (st.queueLabel.userData.html !== qHtml) {
+        st.queueLabel.element.innerHTML = qHtml;
+        st.queueLabel.userData.html = qHtml;
+      }
       {
         let a = 0, b = ls.done.length;
         while (a < b) { const mid = (a + b) >> 1; if (ls.done[mid] <= t) a = mid + 1; else b = mid; }
@@ -522,7 +570,8 @@ export class Pipeline {
     heads.count = nh;
     segs.count = ns;
     fetch.count = nf;
-    for (const m of [heads, segs, fetch]) {
+    this.orders.count = no;
+    for (const m of [heads, segs, fetch, this.orders]) {
       m.instanceMatrix.needsUpdate = true;
       m.instanceColor.needsUpdate = true;
     }

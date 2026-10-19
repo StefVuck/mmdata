@@ -21,7 +21,8 @@
 | 60 | u32 | symbol count *Y* |
 | 64 | char[16] | lane 0 name |
 | 80 | char[16] | lane 1 name |
-| 96 | | reserved, zero |
+| 96 | u32 | ring buffer size in packets, 0 for unbounded |
+| 100 | | reserved, zero |
 
 ## Packets (*P* × 16 bytes)
 

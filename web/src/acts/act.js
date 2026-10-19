@@ -40,6 +40,11 @@ export class Act {
   get held() { return this.script ? this.script.held : false; }
   get caption() { return this.script ? this.script.caption : null; }
   get clockText() { return ''; }
+  get storyProgress() {
+    const s = this.script;
+    if (!s) return 0;
+    return s.done ? 1 : Math.min(1, (s.i + s.progress) / s.beats.length);
+  }
   get stat() { return ''; }
 
   // Time on the journey clock, which starts when the packet enters the firm's cross-connect.

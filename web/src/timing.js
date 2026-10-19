@@ -56,21 +56,49 @@ class LaneSchedule {
     this.outcome = lane.outcome;
     this.cache = new Map();
 
+    // Packets wait in a ring buffer of fixed size, as on the network card. One that arrives
+    // while the ring is full is dropped: it never reaches the software at all.
     const k = 1 / trace.tscGhz;
-    let prev = -Infinity;
-    for (let i = 0; i < n; i++) {
-      const s = Math.max(timeline.arrive[i], prev);
-      this.start[i] = s;
-      let cum = 0;
-      for (let st = 0; st < S; st++) {
-        this.rel[i * (S + 1) + st] = cum;
-        cum += lane.ticks[i * S + st] * k;
+    const slots = trace.ringSlots || 0;
+    this.slots = slots;
+    this.dropped = new Uint8Array(n);
+    const ringIn = [], ringOut = [], dropAt = [], dropMsgs = [];
+    let head = 0, prev = -Infinity, lastStart = -Infinity, droppedSoFar = 0;
+    for (let p = 0; p < trace.packetTotal; p++) {
+      const first = trace.packetFirst[p], count = trace.packetCount[p];
+      const a = timeline.arrive[first];
+      while (head < ringOut.length && ringOut[head] <= a) head++;
+      if (slots && ringOut.length - head >= slots) {
+        for (let i = first; i < first + count; i++) {
+          this.dropped[i] = 1;
+          this.start[i] = this.done[i] = this.exit[i] = lastStart === -Infinity ? a : lastStart;
+        }
+        droppedSoFar += count;
+        dropAt.push(a);
+        dropMsgs.push(droppedSoFar);
+        continue;
       }
-      this.rel[i * (S + 1) + S] = cum;
-      this.done[i] = s + cum;
-      this.exit[i] = this.done[i] + (lane.outcome[i] === 2 ? TX_NS : SINK_NS);
-      prev = this.done[i];
+      for (let i = first; i < first + count; i++) {
+        const s = Math.max(a, prev);
+        this.start[i] = s;
+        lastStart = s;
+        let cum = 0;
+        for (let st = 0; st < S; st++) {
+          this.rel[i * (S + 1) + st] = cum;
+          cum += lane.ticks[i * S + st] * k;
+        }
+        this.rel[i * (S + 1) + S] = cum;
+        this.done[i] = s + cum;
+        this.exit[i] = this.done[i] + (lane.outcome[i] === 2 ? TX_NS : SINK_NS);
+        prev = this.done[i];
+      }
+      ringIn.push(a);
+      ringOut.push(prev);
     }
+    this.ringIn = Float64Array.from(ringIn);
+    this.ringOut = Float64Array.from(ringOut);
+    this.dropAt = Float64Array.from(dropAt);
+    this.dropMsgs = Uint32Array.from(dropMsgs);
     this.end = prev + TX_NS;
     // exit[] is not monotonic because sent orders linger longer; keep a running max for search.
     this.exitMax = new Float64Array(n);
@@ -78,6 +106,16 @@ class LaneSchedule {
     for (let i = 0; i < n; i++) { m = Math.max(m, this.exit[i]); this.exitMax[i] = m; }
 
     this.baseline = trace.counters ? null : this.measureBaseline();
+  }
+
+  // Packets sitting in the ring at time t, and packets and messages dropped so far.
+  ringDepth(t) {
+    return lowerBound(this.ringIn, t + 1e-9) - lowerBound(this.ringOut, t + 1e-9);
+  }
+
+  droppedBy(t) {
+    const k = lowerBound(this.dropAt, t + 1e-9);
+    return { packets: k, messages: k ? this.dropMsgs[k - 1] : 0 };
   }
 
   stageNs(i, s) {
@@ -176,6 +214,7 @@ class LaneSchedule {
   // Where message i is at time t. Fills and returns `out` to avoid allocating per frame.
   locate(i, t, out) {
     out.phase = PHASE_NONE;
+    if (this.dropped[i]) return out;
     const arrive = this.timeline.arrive[i];
     if (t < arrive) return out;
     const start = this.start[i];

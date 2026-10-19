@@ -27,6 +27,7 @@ struct TraceInput {
     double tsc_ghz;
     uint16_t hero_locate;
     uint32_t hero_message;
+    uint32_t ring_slots;
 };
 
 void write_trace(const std::string& path, const TraceInput& in);

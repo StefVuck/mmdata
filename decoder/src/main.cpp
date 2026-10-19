@@ -28,13 +28,14 @@ struct Options {
     int repeat = 0;
     bool average = false;
     long hero_message = -1;
+    uint32_t ring_slots = 512;
 };
 
 void usage() {
     std::fprintf(stderr,
                  "usage: mmdecode --input FILE.itch [--out trace.bin] [--hero SYMBOL]\n"
                  "                [--hero-message INDEX] [--max-messages N] [--cpu N] [--repeat N]\n"
-                 "                [--average] [--no-counters]\n");
+                 "                [--average] [--ring-slots N] [--no-counters]\n");
     std::exit(2);
 }
 
@@ -54,6 +55,7 @@ Options parse(int argc, char** argv) {
         else if (a == "--repeat") o.repeat = std::max(1, std::stoi(next()));
         else if (a == "--hero-message") o.hero_message = std::stol(next());
         else if (a == "--average") o.average = true;
+        else if (a == "--ring-slots") o.ring_slots = uint32_t(std::stoul(next()));
         else if (a == "--no-counters") o.counters = false;
         else usage();
     }
@@ -235,33 +237,60 @@ void counted(const Feed& feed, const PmcSet& pmc, Recording& into, Args... args)
     into.counts = std::move(rec.counts);
 }
 
-// How long each message waits behind earlier ones on a single core: arrivals come from the
-// feed, service times from the recording.
-std::vector<double> queue_wait(const Feed& feed, const Recording& r, double ghz) {
-    std::vector<double> w(feed.message_count());
+// One core reading packets from a ring buffer of fixed size, oldest first. A packet that
+// arrives while the ring is full is dropped, as a network card drops it when the software can't
+// keep up. Returns each message's wait before processing starts, or -1 if it was dropped.
+struct RingRun {
+    std::vector<double> wait;
+    size_t dropped_packets = 0;
+};
+
+RingRun run_ring(const Feed& feed, const Recording& r, double ghz, uint32_t slots) {
+    RingRun out;
+    out.wait.assign(feed.message_count(), 0);
+    std::vector<double> finish;  // finish time of each accepted packet, in order
+    size_t head = 0;
     double free_at = 0;
-    for (size_t i = 0; i < w.size(); ++i) {
-        const double arrive = double(feed.packets[feed.msg_packet[i]].arrival_ns);
-        const double start = std::max(arrive, free_at);
-        double service = 0;
-        for (int s = 0; s < kStageCount; ++s) service += r.ticks[i * kStageCount + s] / ghz;
-        w[i] = start - arrive;
-        free_at = start + service;
+    size_t msg = 0;
+    for (const Packet& p : feed.packets) {
+        const double arrive = double(p.arrival_ns);
+        while (head < finish.size() && finish[head] <= arrive) ++head;
+        if (slots && finish.size() - head >= slots) {
+            for (uint16_t k = 0; k < p.count; ++k) out.wait[msg++] = -1;
+            ++out.dropped_packets;
+            continue;
+        }
+        for (uint16_t k = 0; k < p.count; ++k, ++msg) {
+            const double start = std::max(arrive, free_at);
+            double service = 0;
+            for (int s = 0; s < kStageCount; ++s) service += r.ticks[msg * kStageCount + s] / ghz;
+            out.wait[msg] = start - arrive;
+            free_at = start + service;
+        }
+        finish.push_back(free_at);
     }
-    return w;
+    return out;
 }
 
-// The best story is an order the tuned lane handles at once while the naive lane is still
-// working through a burst: a few microseconds behind, not milliseconds.
-uint32_t pick_hero_message(const Feed& feed, uint16_t hero, const Recording& naive, const Recording& tuned, double ghz) {
-    const std::vector<double> wn = queue_wait(feed, naive, ghz);
-    const std::vector<double> wt = queue_wait(feed, tuned, ghz);
+// The featured message: one the tuned lane handles at once while the naive lane is a few
+// microseconds behind (not dropped, not milliseconds), preferring one where the tuned lane's
+// book stage also had to wait on memory, so both builds' misses are on show.
+uint32_t pick_hero_message(const Feed& feed, uint16_t hero, const RingRun& naive_run, const RingRun& tuned_run,
+                           const Recording& tuned, double ghz) {
     const size_t n = feed.message_count();
+    std::vector<uint32_t> book;
+    for (size_t i = 0; i < n; ++i)
+        if (feed.msg_locate[i] == hero) book.push_back(tuned.ticks[i * kStageCount + kBook]);
+    std::sort(book.begin(), book.end());
+    const double typical = book.empty() ? 0 : book[book.size() / 2] / ghz;
+
     uint32_t best = ~0u;
     double best_score = 1e300;
     for (size_t i = 0; i < n; ++i) {
-        if (feed.msg_locate[i] != hero || tuned.outcome[i] != kSent || wt[i] > 30) continue;
-        const double score = wn[i] < 300 ? 1e6 - wn[i] : std::fabs(std::log(wn[i] / 4000.0));
+        const double wn = naive_run.wait[i], wt = tuned_run.wait[i];
+        if (feed.msg_locate[i] != hero || tuned.outcome[i] != kSent || wn < 0 || wt < 0 || wt > 30) continue;
+        double score = wn < 300 ? 1e6 - wn : std::fabs(std::log(wn / 4000.0));
+        if (tuned.ticks[i * kStageCount + kBook] / ghz < typical + 14) score += 100;
         if (score < best_score) {
             best_score = score;
             best = uint32_t(i);
@@ -357,8 +386,12 @@ int main(int argc, char** argv) {
     const uint16_t hero = pick_hero(feed, opt.hero);
     std::vector<BookEvent> book = hero_book_events(feed, hero);
 
+    const RingRun naive_run = run_ring(feed, naive, ghz, opt.ring_slots);
+    const RingRun tuned_run = run_ring(feed, tuned, ghz, opt.ring_slots);
+    std::printf("ring of %u packets: naive drops %zu packets, tuned drops %zu\n", opt.ring_slots,
+                naive_run.dropped_packets, tuned_run.dropped_packets);
     const uint32_t hero_message = opt.hero_message >= 0 ? uint32_t(opt.hero_message)
-                                                        : pick_hero_message(feed, hero, naive, tuned, ghz);
+                                                        : pick_hero_message(feed, hero, naive_run, tuned_run, tuned, ghz);
 
     size_t sent = 0;
     for (size_t i = 0; i < n; ++i) sent += tuned.outcome[i] == kSent;
@@ -369,7 +402,7 @@ int main(int argc, char** argv) {
     summarise("naive", naive, n, ghz, counters);
     summarise("tuned", tuned, n, ghz, counters);
 
-    TraceInput in{&feed, {&naive, &tuned}, {"naive", "tuned"}, std::move(book), flags, ghz, hero, hero_message};
+    TraceInput in{&feed, {&naive, &tuned}, {"naive", "tuned"}, std::move(book), flags, ghz, hero, hero_message, opt.ring_slots};
     write_trace(opt.output, in);
     std::printf("\nwrote %s\n", opt.output.c_str());
     return mismatches ? 3 : 0;

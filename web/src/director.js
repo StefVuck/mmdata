@@ -12,6 +12,7 @@ import { FibreAct } from './acts/fibre.js';
 import { SwitchAct } from './acts/switch.js';
 import { NicAct } from './acts/nic.js';
 import { CoreAct } from './acts/core.js';
+import { CodeWalkAct } from './acts/codewalk.js';
 
 const PORTAL_OUT = 0.7;
 const PORTAL_IN = 0.9;
@@ -31,13 +32,17 @@ export class Director {
     this.labels.setSize(window.innerWidth, window.innerHeight);
 
     this.hud = new Hud(timeline);
-    this.hud.onJump = (i) => this.go(i, { portal: false });
+    this.hud.onJump = (i, beat) => {
+      this.go(i, { portal: false });
+      if (beat && beat !== this.act.script.beats[0].id) this.act.script.skipTo(beat);
+    };
     this.whiteout = document.getElementById('whiteout');
     this.pauseBtn = document.getElementById('pause-btn');
     this.pauseBtn.addEventListener('click', () => { this.paused = !this.paused; });
 
     const ctx = { timeline, hud: this.hud, director: this };
-    this.acts = [new ExchangeAct(ctx), new FibreAct(ctx), new SwitchAct(ctx), new NicAct(ctx), new CoreAct(ctx)];
+    this.acts = [new ExchangeAct(ctx), new FibreAct(ctx), new SwitchAct(ctx), new NicAct(ctx), new CoreAct(ctx), new CodeWalkAct(ctx)];
+    this.hud.buildNav(this.acts.map((a) => a.script.beats.map((b) => b.id)));
 
     this.composer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.acts[0].scene, this.acts[0].camera);
@@ -96,7 +101,7 @@ export class Director {
     else if (e.code === 'ArrowLeft') this.go(this.current - 1, { portal: false });
     else if (e.code === 'KeyH') document.getElementById('hud').classList.toggle('hidden');
     else if (e.code === 'KeyR') this.go(0, { portal: false });
-    else if (/^Digit[1-5]$/.test(e.code)) this.go(Number(e.code.slice(5)) - 1, { portal: false });
+    else if (/^Digit[1-6]$/.test(e.code)) this.go(Number(e.code.slice(5)) - 1, { portal: false });
     else if (this.act && this.act.key) this.act.key(e);
   }
 
@@ -144,6 +149,7 @@ export class Director {
     this.hud.setClock(a.clockText);
     this.hud.setStat(a.stat);
     this.hud.setCaption(a.caption || (this.paused ? 'Paused' : null));
+    this.hud.setProgress(this.current, a.storyProgress);
     this.hud.caption.classList.toggle('paused', this.paused);
     const label = this.paused ? '▶ Play' : '❚❚ Pause';
     if (this.pauseBtn.textContent !== label) this.pauseBtn.textContent = label;

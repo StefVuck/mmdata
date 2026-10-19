@@ -148,5 +148,6 @@ export function syntheticTrace(seed = 930) {
     heroMessage: hero,
     heroSymbol: 'NOVA',
     heroLocate: 1,
+    ringSlots: 512,
   };
 }

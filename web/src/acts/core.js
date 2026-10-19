@@ -3,7 +3,6 @@ import { Act } from './act.js';
 import { Script } from '../script.js';
 import { Follow, smooth, lerp, fmtNs, fmtDilation, dust } from '../fx.js';
 import { Pipeline } from '../core/pipeline.js';
-import { BookTerrain } from '../core/terrain.js';
 import { CodeCard } from '../code.js';
 import { TX_NS } from '../timing.js';
 import { STAGES, STAGE_TITLES, TYPE_NAMES, WIRE, FIBRE_NS_PER_M } from '../journey.js';
@@ -13,7 +12,7 @@ const CAMERAS = {
   overview: { pos: [-2, 44, 26], look: [0, 0, 2] },
   race: { pos: [-4, 15, 19], look: [-4, 0.8, 0] },
   memory: { pos: [12, 24, 30], look: [16, 0, 0] },
-  book: { pos: [4, 13, 6], look: [4, 0, -32] },
+  ring: { pos: [-25, 13, 15], look: [-13, 0.5, 0] },
 };
 
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -31,7 +30,6 @@ export class CoreAct extends Act {
 
     const tl = this.timeline;
     this.pipeline = new Pipeline(tl, s);
-    this.terrain = new BookTerrain(tl, s, new THREE.Vector3(4, 0.1, -24));
     this.follow = new Follow(this.camera, 2.4);
     this.v = new THREE.Vector3();
     this.v2 = new THREE.Vector3();
@@ -50,6 +48,14 @@ export class CoreAct extends Act {
       this.t = t;
       this.pipeline.laneOffset[0] = offset;
     };
+    const lost = naive.droppedBy(tl.duration);
+    const surgeFrom = lost.packets ? naive.dropAt[0] - 400000 : tl.openTime;
+    const surgeTo = lost.packets ? naive.dropAt[naive.dropAt.length - 1] + 600000 : tl.openTime + 3e6;
+    let tunedPeak = 0;
+    for (let t = surgeFrom; t < surgeTo; t += 2000) tunedPeak = Math.max(tunedPeak, tuned.ringDepth(t));
+    this.window = { story: [Math.max(0, surgeFrom - 200000), Math.min(tl.duration, tl.heroArrive + 400000)],
+      close: [Math.max(0, tl.heroArrive - 15000), Math.min(tl.duration, tl.heroArrive + 15000)] };
+    this.zoom = 'story';
     const order = this.story
       ? `${this.story.orderSide === 'B' ? 'BUY' : 'SELL'} 100 ${tl.trace.heroSymbol} @ ${price(this.story.orderPrice)}`
       : 'the order';
@@ -76,12 +82,16 @@ export class CoreAct extends Act {
         caption: () => (naive.start[hero] - tl.heroArrive > 50
           ? `In the real run it was worse than the race suggests. The naive core was still working through the burst that arrived before this packet, and only reached the featured message <b>${fmtNs(naive.start[hero] - tl.heroArrive)}</b> after it landed. Slow code doesn't just take longer: it falls behind, and then everything waits.`
           : 'The naive core gets to the same message and makes the same decision, just later.') },
-      { id: 'book', hold: 13, dilation: 1e8, onStart: () => { at(tuned.done[hero] + 1)(); this.markBook(); },
+      { id: 'overload', sim: surgeTo - surgeFrom, dilation: () => dil(surgeTo - surgeFrom, 18, 1e3, 1e9), onStart: at(surgeFrom),
+        caption: () => (lost.packets
+          ? `Being slow has a worse failure than lateness. Go back to the open: for its first 3 ms, an exaggerated surge, messages arrive faster than the naive build can process them. Its ring buffer of ${naive.slots.toLocaleString()} packets fills, and the network card drops every packet that won't fit: <b>${lost.packets.toLocaleString()} packets, ${lost.messages.toLocaleString()} messages</b>, shown in red. Each one is a hole in its order book, which stays wrong until the gap is recovered. The tuned build's ring never held more than ${tunedPeak} packets.`
+          : `At the open, messages arrive in a surge. Both builds keep up in this run, but a slower one would fill its ring buffer and start dropping packets.`) },
+      { id: 'book', hold: 14, dilation: 1e8, onStart: () => { at(tuned.done[hero] + 1)(); this.renderLadder(); },
         caption: () => (this.story
-          ? `What was all that work for? This is the order book the Book stage keeps for ${tl.trace.heroSymbol}: every price level, bids in green on the left, asks in red on the right, bar height the shares waiting there, newest row at the front. The featured message was a trade that emptied the best ${this.story.cleared.side === 'B' ? 'bid' : 'ask'} at <b>${price(this.story.cleared.price)}</b>. That is the signal: the price just moved, so the strategy ${this.story.orderSide === 'B' ? 'buys' : 'sells'} at the new best, <b>${price(this.story.orderPrice)}</b>, before others react.`
-          : `This is the order book the Book stage keeps for ${tl.trace.heroSymbol}: bids in green, asks in red, bar height the shares waiting at each price.`) },
+          ? `What all six stages were working out. The Book stage keeps the order book: the shares waiting to buy (bids) and sell (asks) at each price. The featured message was a trade that took every share at the best ${this.story.cleared.side === 'B' ? 'bid' : 'ask'}, <b>${price(this.story.cleared.price)}</b>, so the best price moved to <b>${price(this.story.orderPrice)}</b>. That move is the signal, and the strategy ${this.story.orderSide === 'B' ? 'buys' : 'sells'} 100 shares at the new price.`
+          : `The Book stage keeps the order book for ${tl.trace.heroSymbol}: the shares waiting to buy and sell at each price.`) },
       { id: 'verdict', hold: 9, dilation: 1e6, onStart: at(naive.done[hero] + TX_NS + 1),
-        caption: () => `Same packet, same machine, same decision. Naive: <b>${fmtNs(ttt(0))}</b>. Tuned: <b>${fmtNs(ttt(1))}</b>, and the receipt below breaks down every nanosecond. Now it's yours: drag the timeline, change the slow motion, or follow the next order.` },
+        caption: () => `Same packet, same machine, same decision. Naive: <b>${fmtNs(ttt(0))}</b>, tuned: <b>${fmtNs(ttt(1))}</b>, and the receipt below breaks down every nanosecond.${lost.packets ? ` In the surge, naive also lost ${lost.packets.toLocaleString()} packets.` : ''} Act VI looks at the code itself. Or explore here: drag the timeline, change the slow motion, or follow the next order.` },
     ], 1e8);
 
     this.mode = 'script';
@@ -103,32 +113,53 @@ export class CoreAct extends Act {
     return wire + (ls.done[tl.hero] - tl.heroArrive) + TX_NS;
   }
 
-  // Replays the hero symbol's book up to the featured message to find what it did: which level it
-  // emptied, and so which side and price the strategy's order went out at.
+  // Replays the hero symbol's book around the featured message: what it looked like just before,
+  // just after, which level the trade emptied, and so which side and price the order went out at.
   bookStory() {
     const tl = this.timeline;
     const book = tl.trace.book;
     const levels = { B: new Map(), S: new Map() };
+    let before = null;
     let cleared = null;
+    const top = (side, desc) => [...levels[side].entries()].sort((a, b) => (desc ? b[0] - a[0] : a[0] - b[0])).slice(0, 5);
+    const snap = () => ({ bids: top('B', true), asks: top('S', false) });
     for (let k = 0; k < book.message.length && book.message[k] <= tl.hero; k++) {
+      if (book.message[k] === tl.hero && !before) before = snap();
       const side = book.side[k] === 66 ? 'B' : 'S';
       if (book.kind[k] !== 0) continue;
       if (book.qty[k] > 0) levels[side].set(book.price[k], book.qty[k]);
       else levels[side].delete(book.price[k]);
       if (book.message[k] === tl.hero && book.qty[k] === 0) cleared = { side, price: book.price[k] };
     }
-    if (!cleared) return null;
+    if (!cleared || !before) return null;
     const rest = [...levels[cleared.side].keys()];
     if (!rest.length) return null;
     const orderPrice = cleared.side === 'B' ? Math.max(...rest) : Math.min(...rest);
-    return { cleared, orderSide: cleared.side === 'B' ? 'S' : 'B', orderPrice };
+    return { cleared, orderSide: cleared.side === 'B' ? 'S' : 'B', orderPrice, before, after: snap() };
   }
 
-  markBook() {
-    if (!this.story) return;
+  // A plain price ladder before and after the trade, which says what the 3D scene can't.
+  renderLadder() {
+    const el = document.getElementById('ladder');
     const s = this.story;
-    this.terrain.setMarker(0, s.cleared.price, `Emptied by the featured message<span class="ns">${price(s.cleared.price)}</span>`, 0xffffff);
-    this.terrain.setMarker(1, s.orderPrice, `Strategy's order: ${s.orderSide === 'B' ? 'buy' : 'sell'}<span class="ns">${price(s.orderPrice)}</span>`, 0xffc44d);
+    if (!s) { el.innerHTML = ''; return; }
+    const max = Math.max(...[s.before, s.after].flatMap((b) => [...b.bids, ...b.asks].map((l) => l[1])));
+    const rows = (b, after) => {
+      const row = (side, [p, q]) => {
+        const cleared = !after && side === s.cleared.side && p === s.cleared.price;
+        const ours = after && side === s.cleared.side && p === s.orderPrice;
+        const note = cleared ? '<span class="note">all taken by the trade</span>' : ours ? `<span class="note gold">strategy ${s.orderSide === 'B' ? 'buys' : 'sells'} here</span>` : '';
+        return `<div class="lrow ${side === 'B' ? 'bid' : 'ask'}${cleared ? ' cleared' : ''}${ours ? ' ours' : ''}"><span class="p">${price(p)}</span><span class="bar"><i style="width:${(q / max) * 100}%"></i></span><span class="q">${q.toLocaleString()}</span><span class="tag">${note}</span></div>`;
+      };
+      return [...b.asks].reverse().map((l) => row('S', l)).join('') + '<div class="spread">spread</div>' + b.bids.map((l) => row('B', l)).join('');
+    };
+    el.innerHTML = `
+      <div class="ladder-title">${this.timeline.trace.heroSymbol} order book, five best prices each side <span>asks (selling) in red, bids (buying) in green, bars show shares waiting</span></div>
+      <div class="ladders">
+        <div class="ladder"><h4>Just before the trade</h4>${rows(s.before, false)}</div>
+        <div class="arrow">→</div>
+        <div class="ladder"><h4>Just after</h4>${rows(s.after, true)}</div>
+      </div>`;
   }
 
   buildControls() {
@@ -139,8 +170,9 @@ export class CoreAct extends Act {
       <div class="ctl-row"><label>Lanes</label><div class="chips"><button class="chip lane-0 on" data-lane="0">Naive</button><button class="chip lane-1 on" data-lane="1">Tuned</button></div></div>
       <div class="ctl-row"><label>Camera</label><div class="chips">
         <button class="chip" data-cam="follow">Follow</button><button class="chip" data-cam="overview">Overview</button>
-        <button class="chip" data-cam="memory">Memory</button><button class="chip" data-cam="book">Order book</button></div></div>
+        <button class="chip" data-cam="memory">Memory</button><button class="chip" data-cam="ring">Ring buffers</button></div></div>
       <div class="ctl-row"><label>Jump to</label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Featured message</button></div></div>
+      <div class="ctl-row"><label></label><button class="chip on" id="ctl-code">Act VI: read the code →</button></div>
       <div class="ctl-row"><label>Panel</label><div class="chips"><button class="chip on" data-panel="code">Code</button><button class="chip" data-panel="numbers">Numbers</button></div></div>`;
     root.querySelectorAll('[data-lane]').forEach((b) => b.addEventListener('click', () => {
       const l = Number(b.dataset.lane);
@@ -150,6 +182,7 @@ export class CoreAct extends Act {
     root.querySelectorAll('[data-cam]').forEach((b) => b.addEventListener('click', () => this.setCamera(b.dataset.cam)));
     root.querySelectorAll('[data-panel]').forEach((b) => b.addEventListener('click', () => this.setPanel(b.dataset.panel === 'code')));
     root.querySelector('#ctl-next').addEventListener('click', () => this.nextOrder());
+    root.querySelector('#ctl-code').addEventListener('click', () => this.ctx.director.go(5));
     root.querySelector('#ctl-hero').addEventListener('click', () => {
       this.pipeline.focus = this.timeline.hero;
       this.t = this.tStart;
@@ -169,6 +202,7 @@ export class CoreAct extends Act {
         <canvas></canvas><div class="tp-head"></div>
         <div class="tp-hint">Click or drag the timeline to jump to any moment</div>
       </div>
+      <div class="tp-zoom"><button class="chip on" data-zoom="story">Open to order</button><button class="chip" data-zoom="close">Close-up</button></div>
       <label class="tp-label">Slow motion</label>
       <input class="tp-dil" type="range" min="0" max="9.3" step="0.01" title="Drag to change the slow-motion factor">
       <span class="tp-dil-val"></span>
@@ -180,6 +214,11 @@ export class CoreAct extends Act {
     this.tpDil = root.querySelector('.tp-dil');
     this.tpDilVal = root.querySelector('.tp-dil-val');
     this.tpMode = root.querySelector('.tp-mode');
+    root.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', () => {
+      this.zoom = b.dataset.zoom;
+      root.querySelectorAll('[data-zoom]').forEach((x) => x.classList.toggle('on', x === b));
+      this.drawTimeline();
+    }));
 
     this.tpPlay.addEventListener('click', () => { this.ctx.director.paused = !this.ctx.director.paused; });
     this.tpMode.addEventListener('click', () => {
@@ -194,7 +233,8 @@ export class CoreAct extends Act {
       const r = this.tpLine.getBoundingClientRect();
       const f = clamp((e.clientX - r.left) / r.width, 0, 1);
       if (this.mode === 'script') this.startFree();
-      this.t = f * this.timeline.duration;
+      const [a, b] = this.window[this.zoom];
+      this.t = a + f * (b - a);
     };
     let dragging = false;
     this.tpLine.addEventListener('pointerdown', (e) => {
@@ -217,14 +257,18 @@ export class CoreAct extends Act {
     const g = c.getContext('2d');
     g.scale(dpr, dpr);
     const tl = this.timeline;
-    const x = (t) => (t / tl.duration) * w;
+    const [wa, wb] = this.window[this.zoom];
+    const x = (t) => ((t - wa) / (wb - wa)) * w;
     g.fillStyle = 'rgba(255,255,255,0.06)';
     g.fillRect(0, h / 2 - 3, w, 6);
     // Message density, so the burst at the open is visible.
     const bins = Math.floor(w / 2);
     const counts = new Array(bins).fill(0);
-    for (let i = 0; i < tl.arrive.length; i++) counts[Math.min(bins - 1, Math.floor((tl.arrive[i] / tl.duration) * bins))]++;
-    const peak = Math.max(...counts);
+    for (let i = 0; i < tl.arrive.length; i++) {
+      const f = (tl.arrive[i] - wa) / (wb - wa);
+      if (f >= 0 && f < 1) counts[Math.floor(f * bins)]++;
+    }
+    const peak = Math.max(1, ...counts);
     g.fillStyle = 'rgba(63,216,255,0.35)';
     counts.forEach((n, k) => {
       const bh = (n / peak) * (h / 2 - 4);
@@ -232,9 +276,12 @@ export class CoreAct extends Act {
     });
     const ls = tl.lanes[1];
     g.fillStyle = 'rgba(255,196,77,0.55)';
-    for (let i = 0; i < ls.n; i++) if (ls.outcome[i] === 2) g.fillRect(x(ls.done[i]), h / 2 + 4, 1, 5);
+    for (let i = 0; i < ls.n; i++) if (ls.outcome[i] === 2 && ls.done[i] >= wa && ls.done[i] <= wb) g.fillRect(x(ls.done[i]), h / 2 + 4, 1, 5);
+    const nv = tl.lanes[0];
+    g.fillStyle = 'rgba(255,59,79,0.8)';
+    for (const d of nv.dropAt) if (d >= wa && d <= wb) g.fillRect(x(d), h / 2 - 9, 1, 5);
     g.font = '10px system-ui, sans-serif';
-    if (tl.openTime > 0 && tl.openTime < tl.duration) {
+    if (tl.openTime > wa && tl.openTime < wb) {
       g.fillStyle = 'rgba(255,255,255,0.7)';
       g.fillRect(x(tl.openTime), 2, 1, h - 4);
       g.fillText('09:30 open', x(tl.openTime) + 4, 11);
@@ -246,6 +293,10 @@ export class CoreAct extends Act {
     g.fillText('featured packet', x(tl.heroArrive) + 6, h - 3);
     g.fillStyle = 'rgba(255,196,77,0.9)';
     g.fillText('orders', 4, h - 3);
+    if (nv.dropAt.length) {
+      g.fillStyle = 'rgba(255,90,110,0.95)';
+      g.fillText('naive drops', 50, h - 3);
+    }
   }
 
   setPanel(code) {
@@ -275,13 +326,13 @@ export class CoreAct extends Act {
     this.t = this.tStart;
     this.pipeline.focus = this.timeline.hero;
     this.pipeline.laneOffset[0] = 0;
-    this.terrain.reset();
     this.follow.snap = true;
     this.camMode = 'follow';
     this.controls.hidden = true;
     this.inspector.hidden = true;
     this.code.setVisible(false);
     this.transport.hidden = false;
+    document.getElementById('legend').hidden = false;
     document.body.classList.add('has-transport');
     requestAnimationFrame(() => this.drawTimeline());
   }
@@ -292,6 +343,8 @@ export class CoreAct extends Act {
     this.inspector.hidden = true;
     this.code.setVisible(false);
     this.transport.hidden = true;
+    document.getElementById('legend').hidden = true;
+    document.getElementById('ladder').hidden = true;
     document.body.classList.remove('has-transport');
   }
 
@@ -311,6 +364,10 @@ export class CoreAct extends Act {
 
   get finished() {
     return false;
+  }
+
+  get storyProgress() {
+    return this.mode === 'free' ? 1 : super.storyProgress;
   }
 
   get dilation() {
@@ -334,16 +391,14 @@ export class CoreAct extends Act {
       if (this.script.done) this.startFree();
     } else if (dt > 0) {
       this.t += (dt * 1e9) / this.freeDilation;
-      if (this.t >= tl.duration) this.t = 0;
+      const [wa, wb] = this.window[this.zoom];
+      if (this.t >= wb || this.t < wa) this.t = wa;
     }
     const wall = performance.now() / 1000;
     const trail = (TRAIL_WALL * 1e9) / this.dilation;
     this.pipeline.update(this.t, trail, wall);
     const id = this.mode === 'script' ? this.script.id : null;
-    const showBook = id === 'book' || (this.mode === 'free' && this.camMode === 'book');
-    this.terrain.group.visible = showBook;
-    this.terrain.setLabelsVisible(showBook);
-    if (showBook) this.terrain.update(this.t, wall);
+    document.getElementById('ladder').hidden = id !== 'book';
     this.updateReceipt();
     this.updateCamera(wallDt);
     this.updateCode();
@@ -363,7 +418,8 @@ export class CoreAct extends Act {
     const play = paused ? '▶ Play' : '❚❚ Pause';
     if (this.tpPlay.textContent !== play) this.tpPlay.textContent = play;
     this.tpPlay.classList.toggle('paused', paused);
-    this.tpHead.style.left = `${clamp(this.t / this.timeline.duration, 0, 1) * 100}%`;
+    const [wa, wb] = this.window[this.zoom];
+    this.tpHead.style.left = `${clamp((this.t - wa) / (wb - wa), 0, 1) * 100}%`;
     if (document.activeElement !== this.tpDil) this.tpDil.value = String(Math.log10(this.dilation));
     const d = fmtDilation(this.dilation);
     if (this.tpDilVal.textContent !== d) this.tpDilVal.textContent = d;
@@ -410,7 +466,8 @@ export class CoreAct extends Act {
     let mode = this.camMode;
     if (id === 'race') mode = 'race';
     if (id === 'naive' || id === 'verdict') mode = 'overview';
-    if (id === 'book') mode = 'book';
+    if (id === 'overload') mode = 'ring';
+    if (id === 'book') mode = 'overview';
 
     if (id === 'arrive') {
       const k = smooth(this.script.progress * 1.2);

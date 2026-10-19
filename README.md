@@ -50,9 +50,15 @@ Act V is a motherboard seen from above, drawn to scale with latency: one unit of
 
 Alongside, a code card shows the naive and tuned source for whichever stage the featured message is in. The snippets are cut from `decoder/src` at build time, so they are always the code that was measured. During a stall, the lines that touch memory light up in the colour of the level being waited on. Which line stalled is an annotation, since the counters are per stage, not per line.
 
-The act is told in beats. First a race: the featured message replayed on both cores at the same instant, so you can watch tuned finish all six stages and send its order while naive is still updating its book. Then the same run one stage at a time, with the code card explaining each difference. The order goes out to the network card, a wider shot shows how the naive core had also fallen behind in the burst, and the order book appears with the price level the featured message emptied and the order that move triggered. The receipt lines the two builds up stage by stage, so every stage is visible for both even when tuned takes a few nanoseconds.
+The act is told in beats. First a race: the featured message replayed on both cores at the same instant, so you can watch tuned finish all six stages and send its order while naive is still updating its book. Then the same run one stage at a time, with the code card alongside. The order goes out to the network card, and a wider shot shows how far the naive core had fallen behind in the burst. Then back to the open, where a surge of messages fills the naive core's ring buffer until the network card starts dropping packets, shown in red and counted, while the tuned core's ring barely fills. Finally a plain before-and-after price ladder shows what the trade did to the order book, and why that triggered an order. The receipt lines the two builds up stage by stage, so every stage is visible for both even when tuned takes a few nanoseconds.
 
-A transport bar runs along the bottom throughout: pause, a timeline you can click or drag to jump anywhere in the trace (the burst at the open, the featured packet and every order are marked on it), the slow-motion slider from real time to ×10⁹, and a button to skip to free play or replay the story. Touching the timeline or the slider mid-story drops you into free play at that moment. Free play adds overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both builds.
+Messages are drawn in states: dim and small while waiting in the ring, bright in their type's colour while being processed, a fading grey dot once finished with nothing to do, a gold diamond when they become an order, and red when dropped. A legend sits in the corner.
+
+A transport bar runs along the bottom: pause, a timeline covering the open through to the featured order (or a close-up around the featured packet), with the burst, every order and every naive drop marked, the slow-motion slider from real time to ×10⁹, and a button to skip to free play or replay the story. Touching the timeline or the slider mid-story drops you into free play at that moment. Free play adds overview, follow, memory and ring buffer cameras, and a jump to the next order. The bar across the top tracks progress through the whole story, one section per act and a tick per beat; click anywhere on it to jump.
+
+### VI. The code
+
+A reading section, one page per stage, with next and back controls. Each page explains in detail why one build hits cache and the other doesn't, shows both builds' code side by side, and marks every line that touches memory with the kind of access it makes (a pointer chase, a heap allocation, a single load into a flat table) and a bar for what that kind of access typically costs. Those per-line costs are typical figures, labelled as such; the measured numbers on each page are the stage's times for the featured message, the median and the slowest 1% across the trace.
 
 ## Running it
 
@@ -68,7 +74,7 @@ A trace from the synthetic feed is committed in `web/public/trace.bin`, so `cd w
 | Control | What it does |
 |---|---|
 | Space | pause and resume |
-| ← → or 1 to 5 | change act |
+| ← → or 1 to 6 | change act |
 | F | toggle the follow camera |
 | N | jump to the next order (free play) |
 | H | hide the overlay for a clean recording |
@@ -102,7 +108,7 @@ When `perf_event_open` is available, a separate pass reads four counters per sta
 
 Without counters (in a VM or container, or with `--no-counters`), the viewer infers stalls from how far each stage's time sits above that stage's typical time, and says so in the corner of the screen. Branch mispredicts cannot be inferred that way and are not shown.
 
-The viewer schedules each lane as a single core: a message starts once it has arrived and the previous message has finished, with arrival times taken from the exchange timestamps. That is how the naive lane builds a queue during a burst while the tuned lane keeps up. The decoder picks the featured message from inside such a burst unless you choose one with `--hero-message`.
+The viewer schedules each lane as a single core: a message starts once it has arrived and the previous message has finished, with arrival times taken from the exchange timestamps. Packets wait in a ring buffer of 512 packets (`--ring-slots` to change), and a packet that arrives while the ring is full is dropped, as a network card drops it when the software falls behind. The decoder and viewer use the same model, so they agree on every drop. That is how the naive lane builds a queue, and loses packets, during a burst while the tuned lane keeps up. The synthetic feed's opening surge is deliberately exaggerated to show this. The decoder picks the featured message from inside such a burst unless you choose one with `--hero-message`.
 
 Everything outside the trading software (fibre, switch, network card, PCIe and the transmit path) uses typical published figures from `web/src/journey.js`. The receipt hatches those segments so nobody mistakes them for measurements. Change them to match your own setup.
 

@@ -55,6 +55,7 @@ void write_trace(const std::string& path, const TraceInput& in) {
     uint32_t symbol_count = 0;
     for (const auto& s : feed.symbols) symbol_count += !s.empty();
     put32(60, symbol_count);
+    put32(96, in.ring_slots);
     for (size_t i = 0; i < in.lane_names.size() && i < 2; ++i)
         std::memcpy(header + 64 + i * 16, in.lane_names[i].data(), in.lane_names[i].size() < 15 ? in.lane_names[i].size() : 15);
     w.raw(header, sizeof header);

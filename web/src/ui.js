@@ -16,6 +16,7 @@ export const ACTS = [
   { n: 'III', title: 'The switch' },
   { n: 'IV', title: 'The network card' },
   { n: 'V', title: 'The core' },
+  { n: 'VI', title: 'The code' },
 ];
 
 export class Receipt {
@@ -137,12 +138,6 @@ export class Hud {
     this.captionText = null;
     this.onJump = null;
 
-    ACTS.forEach((a, i) => {
-      const b = el('button', 'nav-dot');
-      b.innerHTML = `<span class="nav-n">${a.n}</span><span class="nav-t">${a.title}</span>`;
-      b.addEventListener('click', () => this.onJump && this.onJump(i));
-      this.nav.append(b);
-    });
 
     const t = timeline.trace;
     const bits = [];
@@ -152,13 +147,43 @@ export class Hud {
     this.badge.textContent = bits.join(' · ');
   }
 
+  // The story bar: one section per act, sized by its number of beats, with a tick per beat.
+  // Clicking jumps to that act at the beat under the pointer.
+  buildNav(beatsPerAct) {
+    this.nav.innerHTML = '';
+    this.navActs = beatsPerAct.map((beats, i) => {
+      const seg = el('div', 'story-act');
+      seg.style.flexGrow = String(Math.max(2, beats.length));
+      seg.innerHTML = `<div class="story-label"><span class="nav-n">${ACTS[i].n}</span> ${ACTS[i].title}</div><div class="story-track"><i></i></div>`;
+      const track = seg.querySelector('.story-track');
+      beats.forEach((_, k) => {
+        if (k === 0) return;
+        const tick = el('span', 'story-tick');
+        tick.style.left = `${(k / beats.length) * 100}%`;
+        track.append(tick);
+      });
+      seg.addEventListener('click', (e) => {
+        const r = track.getBoundingClientRect();
+        const f = Math.max(0, Math.min(0.999, (e.clientX - r.left) / r.width));
+        if (this.onJump) this.onJump(i, beats[Math.floor(f * beats.length)]);
+      });
+      this.nav.append(seg);
+      return { seg, fill: seg.querySelector('i') };
+    });
+  }
+
+  setProgress(act, fraction) {
+    if (!this.navActs) return;
+    this.navActs.forEach((a, k) => {
+      const f = k < act ? 1 : k > act ? 0 : fraction;
+      a.fill.style.width = `${f * 100}%`;
+      a.seg.classList.toggle('current', k === act);
+    });
+  }
+
   setAct(i) {
     this.actNum.textContent = ACTS[i].n;
     this.actTitle.textContent = ACTS[i].title;
-    [...this.nav.children].forEach((c, k) => {
-      c.classList.toggle('current', k === i);
-      c.classList.toggle('past', k < i);
-    });
   }
 
   setDilation(d, held = false) {
