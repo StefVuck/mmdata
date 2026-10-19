@@ -106,9 +106,10 @@ export class Director {
     this.acts.forEach((a) => a.resize(w / h));
   }
 
-  frame() {
+  // A fixed step can be passed in to render frame by frame, as the GIF capture does.
+  frame(step) {
     this.timer.update();
-    const dt = Math.min(this.timer.getDelta(), 1 / 20);
+    const dt = step ?? Math.min(this.timer.getDelta(), 1 / 20);
     const act = this.act;
     act.update(this.paused ? 0 : dt, dt);
 
