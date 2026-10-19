@@ -60,6 +60,7 @@ export class Pipeline {
     this.c = new THREE.Color();
     this.focusPos = [new THREE.Vector3(), new THREE.Vector3()];
     this.focusAlive = [false, false];
+    this.focusState = [null, null];
   }
 
   buildStrata() {
@@ -209,6 +210,7 @@ export class Pipeline {
 
     for (let lane = 0; lane < tl.lanes.length; lane++) {
       this.focusAlive[lane] = false;
+      this.focusState[lane] = null;
       if (!this.laneVisible[lane]) continue;
       const ls = tl.lanes[lane];
       const lo = ls.firstVisible(t - trailNs);
@@ -275,6 +277,11 @@ export class Pipeline {
             if (isFocus) {
               this.focusPos[lane].copy(q);
               this.focusAlive[lane] = true;
+              this.focusState[lane] = {
+                phase: st.phase,
+                stage: st.phase === PHASE_STAGE ? st.stage : -1,
+                kind: st.phase === PHASE_STAGE && st.event ? st.event.kind : null,
+              };
             }
             if (st.phase === PHASE_STAGE && st.event && nsh < MAX_SHAFTS) {
               const e = st.event;

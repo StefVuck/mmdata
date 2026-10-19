@@ -4,6 +4,7 @@ import { Script } from '../script.js';
 import { Follow, smooth, lerp, fmtNs, fmtDilation, dust } from '../fx.js';
 import { Pipeline, EGRESS_X } from '../core/pipeline.js';
 import { BookTerrain } from '../core/terrain.js';
+import { CodeCard } from '../code.js';
 import { TX_NS } from '../timing.js';
 import { STAGES, STAGE_TITLES, TYPE_NAMES, WIRE, FIBRE_NS_PER_M } from '../journey.js';
 
@@ -62,6 +63,9 @@ export class CoreAct extends Act {
     this.freeDilation = 1e8;
     this.buildControls();
     this.inspector = document.getElementById('inspector');
+    this.code = new CodeCard();
+    this.codeStage = 0;
+    this.showCode = true;
     this.lastInspect = 0;
   }
 
@@ -83,7 +87,8 @@ export class CoreAct extends Act {
       <div class="ctl-row"><label>Camera</label><div class="chips">
         <button class="chip" data-cam="follow">Follow</button><button class="chip" data-cam="overview">Overview</button>
         <button class="chip" data-cam="wells">Wells</button><button class="chip" data-cam="book">Book</button></div></div>
-      <div class="ctl-row"><label></label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Our message</button><button class="chip" id="ctl-replay">Replay journey</button></div></div>`;
+      <div class="ctl-row"><label></label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Our message</button><button class="chip" id="ctl-replay">Replay journey</button></div></div>
+      <div class="ctl-row"><label>Panel</label><div class="chips"><button class="chip on" data-panel="code">Code</button><button class="chip" data-panel="numbers">Numbers</button></div></div>`;
     const dil = root.querySelector('#ctl-dil');
     dil.addEventListener('input', () => { this.freeDilation = 10 ** Number(dil.value); });
     const time = root.querySelector('#ctl-time');
@@ -95,6 +100,7 @@ export class CoreAct extends Act {
       b.classList.toggle('on', this.pipeline.laneVisible[l]);
     }));
     root.querySelectorAll('[data-cam]').forEach((b) => b.addEventListener('click', () => this.setCamera(b.dataset.cam)));
+    root.querySelectorAll('[data-panel]').forEach((b) => b.addEventListener('click', () => this.setPanel(b.dataset.panel === 'code')));
     root.querySelector('#ctl-next').addEventListener('click', () => this.nextOrder());
     root.querySelector('#ctl-hero').addEventListener('click', () => {
       this.pipeline.focus = this.timeline.hero;
@@ -106,6 +112,11 @@ export class CoreAct extends Act {
     this.dilInput = dil;
     this.timeInput = time;
     this.playBtn = root.querySelector('#ctl-play');
+  }
+
+  setPanel(code) {
+    this.showCode = code;
+    this.controls.querySelectorAll('[data-panel]').forEach((b) => b.classList.toggle('on', (b.dataset.panel === 'code') === code));
   }
 
   setCamera(mode) {
@@ -134,19 +145,20 @@ export class CoreAct extends Act {
     this.camMode = 'follow';
     this.controls.hidden = true;
     this.inspector.hidden = true;
+    this.code.setVisible(false);
   }
 
   exit() {
     super.exit();
     this.controls.hidden = true;
     this.inspector.hidden = true;
+    this.code.setVisible(false);
   }
 
   startFree() {
     this.mode = 'free';
     this.freeDilation = this.script.dilation;
     this.controls.hidden = false;
-    this.inspector.hidden = false;
     this.setCamera(this.camMode === 'follow' ? 'book' : this.camMode);
   }
 
@@ -188,7 +200,10 @@ export class CoreAct extends Act {
     this.updateReceipt();
     this.updateCamera(wallDt);
 
+    this.updateCode();
+
     if (this.mode === 'free') {
+      this.inspector.hidden = this.showCode;
       if (document.activeElement !== this.dilInput) this.dilInput.value = String(Math.log10(this.freeDilation));
       document.getElementById('ctl-dil-val').textContent = fmtDilation(this.freeDilation);
       if (document.activeElement !== this.timeInput) this.timeInput.value = String(Math.round((this.t / tl.duration) * 1000));
@@ -198,6 +213,22 @@ export class CoreAct extends Act {
         this.renderInspector();
       }
     }
+  }
+
+  // The code card follows our message through the stages: during the tuned run in the
+  // script, and in free play whenever the code panel is chosen.
+  updateCode() {
+    const id = this.mode === 'script' ? this.script.id : null;
+    const show = this.mode === 'free' ? this.showCode : id === 'tuned' || id === 'out' || id === 'naive';
+    this.code.setVisible(show);
+    if (!show) return;
+    const [n, t] = this.pipeline.focusState;
+    const inStage = (s) => s && s.stage >= 0;
+    if (id === 'naive' ? inStage(n) : inStage(t)) this.codeStage = (id === 'naive' ? n : t).stage;
+    else if (inStage(t)) this.codeStage = t.stage;
+    else if (inStage(n)) this.codeStage = n.stage;
+    const f = this.pipeline.focus;
+    this.code.update(this.codeStage, this.timeline.lanes.map((ls) => ls.stageNs(f, this.codeStage)), [n, t]);
   }
 
   updateReceipt() {
@@ -238,8 +269,10 @@ export class CoreAct extends Act {
       } else {
         const h = p.focusPos[lane];
         const x = Math.min(h.x, EGRESS_X - 2);
-        pos.set(x - 6.5, h.y + 4, h.z + 12.5);
-        look.set(x + 3, h.y - 0.6, h.z - 1);
+        // With the code card open on the left, frame our message right of centre.
+        const side = this.code.visible ? 1 : 0;
+        pos.set(x - 6.5 + side * 4, h.y + 4, h.z + 12.5);
+        look.set(x + 3 - side * 7.5, h.y - 0.6, h.z - 1);
       }
     } else {
       const c = CAMERAS[mode];
