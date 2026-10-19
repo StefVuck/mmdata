@@ -33,6 +33,8 @@ export class Director {
     this.hud = new Hud(timeline);
     this.hud.onJump = (i) => this.go(i, { portal: false });
     this.whiteout = document.getElementById('whiteout');
+    this.pauseBtn = document.getElementById('pause-btn');
+    this.pauseBtn.addEventListener('click', () => { this.paused = !this.paused; });
 
     const ctx = { timeline, hud: this.hud, director: this };
     this.acts = [new ExchangeAct(ctx), new FibreAct(ctx), new SwitchAct(ctx), new NicAct(ctx), new CoreAct(ctx)];
@@ -141,7 +143,11 @@ export class Director {
     this.hud.setDilation(a.dilation, a.held);
     this.hud.setClock(a.clockText);
     this.hud.setStat(a.stat);
-    this.hud.setCaption(this.paused ? 'Paused' : a.caption);
+    this.hud.setCaption(a.caption || (this.paused ? 'Paused' : null));
+    this.hud.caption.classList.toggle('paused', this.paused);
+    const label = this.paused ? '▶ Play' : '❚❚ Pause';
+    if (this.pauseBtn.textContent !== label) this.pauseBtn.textContent = label;
+    this.pauseBtn.classList.toggle('paused', this.paused);
 
     this.composer.render();
     this.labels.render(a.scene, a.camera);

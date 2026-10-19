@@ -59,6 +59,19 @@ export class BookTerrain {
     this.group.add(now, past);
     this.labels = [title, this.bidLabel, this.askLabel, now, past];
 
+    // Price markers on the front row: a thin beam with a label, used to point at the level
+    // our message emptied and the price our order went out at.
+    this.markers = [0, 1].map((k) => {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.06, 7, 0.06), glow(0xffffff, 0.8));
+      const l = label('', 'label marker', true);
+      l.position.set(0, k ? 1.2 : 3.9, 0);
+      l.center.set(k ? 0 : 1, 1);
+      beam.add(l);
+      beam.visible = false;
+      this.group.add(beam);
+      return { beam, label: l, price: 0 };
+    });
+
     this.rows = Array.from({ length: ROWS }, () => ({ centre: 0, bid: new Float32Array(COLS), ask: new Float32Array(COLS), used: false }));
     this.head = 0;
     this.trades = [];
@@ -175,6 +188,11 @@ export class BookTerrain {
       this.flashes.setColorAt(f++, this.c);
     }
     this.flashes.count = f;
+    for (const m of this.markers) {
+      if (!m.price) continue;
+      const col = Math.round((m.price - this.centre) / TICK) + half;
+      m.beam.position.set((col - half) * CELL, 3.5, 0.6);
+    }
     this.flashes.instanceMatrix.needsUpdate = true;
     if (this.flashes.instanceColor) this.flashes.instanceColor.needsUpdate = true;
 
@@ -185,8 +203,18 @@ export class BookTerrain {
     if (this.askLabel.element.innerHTML !== askHtml) this.askLabel.element.innerHTML = askHtml;
   }
 
+  setMarker(k, price, html, color) {
+    const m = this.markers[k];
+    m.price = price;
+    m.beam.visible = price > 0;
+    m.beam.material.color.set(color);
+    m.label.element.innerHTML = html;
+    m.label.element.style.borderColor = new THREE.Color(color).getStyle();
+  }
+
   setLabelsVisible(v) {
     for (const l of this.labels) l.visible = v;
+    for (const m of this.markers) m.label.visible = v && m.price > 0;
   }
 
   get centrePoint() {

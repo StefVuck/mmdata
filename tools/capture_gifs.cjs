@@ -10,7 +10,7 @@ const CLIPS = [
   { name: 'act2-fibre', query: 'act=2&beat=coil&advance=0.8', frames: 40, dt: 1 / 9 },
   { name: 'act3-switch', query: 'act=3&beat=cross', frames: 40, dt: 1 / 7.5 },
   { name: 'act4-nic', query: 'act=4&beat=unpack&advance=0.5', frames: 44, dt: 1 / 3.6 },
-  { name: 'act5-core', query: 'act=5&beat=tuned&advance=4', frames: 44, dt: 1 / 7, hud: true },
+  { name: 'act5-core', query: 'act=5&beat=detail&advance=4', frames: 44, dt: 1 / 7, hud: true },
   { name: 'act5-beam', query: 'act=5&beat=verdict&advance=9', frames: 44, dt: 1 / 12,
     setup: (d) => { const a = d.act; a.freeDilation = 3e3; a.t = 0.05 * d.timeline.duration; a.setCamera('memory'); for (let k = 0; k < 150; k++) d.frame(1 / 30); } },
 ];

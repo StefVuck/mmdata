@@ -37,6 +37,23 @@ export function wireBox(w, h, d, color, opacity = 0.8, fill = 0.03) {
   return g;
 }
 
+// An opaque block with lit faces and crisp coloured edges, for physical components. The faces
+// are pushed back slightly so the edges never flicker against them.
+export function solidBox(w, h, d, color, { edge = 0.6, tint = 0.14 } = {}) {
+  const g = new THREE.Group();
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const c = new THREE.Color(color);
+  const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0x0a0e16).lerp(c, tint), roughness: 0.55, metalness: 0.35,
+    emissive: c, emissiveIntensity: 0.04, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+  }));
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMaterial(color, edge));
+  g.add(body, edges);
+  g.userData.body = body;
+  g.userData.edges = edges;
+  return g;
+}
+
 export function polyline(points, color, opacity = 1) {
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   return new THREE.Line(geo, lineMaterial(color, opacity));

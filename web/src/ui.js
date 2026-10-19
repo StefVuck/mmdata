@@ -31,13 +31,13 @@ export class Receipt {
       wire('pcie', 'PCIe DMA', WIRE.pcieNs),
       wire('poll', 'Poll', WIRE.pollNs),
     ];
+    // Both rows share the same columns in the same order, so every stage lines up and is
+    // visible for both builds even when one of them takes a few nanoseconds.
     this.rows = timeline.heroStats.map((h, lane) => {
       const segs = this.shared.map((s) => ({ ...s }));
       segs.push({ id: 'queue', label: 'Queue', ns: h.queue, queue: true });
-      STAGES.forEach((id, s) => {
-        if (h.stages[s] > 0) segs.push({ id, label: STAGE_TITLES[s], ns: h.stages[s], measured: true });
-      });
-      segs.push({ id: 'tx', label: 'Tx to wire', ns: WIRE.txNs, typical: true });
+      STAGES.forEach((id, s) => segs.push({ id, label: STAGE_TITLES[s], ns: h.stages[s], measured: true }));
+      segs.push({ id: 'tx', label: 'Out to wire', ns: WIRE.txNs, typical: true });
       return { lane, segs, fill: new Map() };
     });
     this.build();
@@ -45,24 +45,29 @@ export class Receipt {
 
   build() {
     this.root.innerHTML = '';
-    const max = Math.max(...this.rows.map((r) => r.segs.reduce((a, s) => a + s.ns, 0)));
-    // Small segments get a minimum width so they stay legible; the numbers carry the truth.
+    const cols = this.rows[0].segs.map((s, k) => Math.max(...this.rows.map((r) => r.segs[k].ns)));
+    const sum = cols.reduce((a, b) => a + b, 0);
+    // Columns are as wide as the slower build needs, with a floor so the shortest stays readable.
+    // Inside a column, each build's bar is in proportion to its own time.
     for (const row of [...this.rows].reverse()) {
       const line = el('div', `receipt-row lane-${row.lane}`);
       line.append(el('div', `receipt-lane lane-${row.lane}`, LANE_TITLES[row.lane]));
       const bar = el('div', 'receipt-bar');
       row.els = new Map();
-      for (const s of row.segs) {
+      row.segs.forEach((s, k) => {
         const seg = el('div', `seg ${s.typical ? 'typical' : ''} ${s.queue ? 'queue' : ''} ${s.measured ? 'measured' : ''}`);
-        seg.style.flexGrow = String(Math.max(s.ns / max, 0.018));
+        seg.style.flexGrow = String(Math.max(cols[k] / sum, 0.045));
+        const track = el('div', 'seg-track');
+        track.style.width = `${cols[k] > 0 ? (s.ns / cols[k]) * 100 : 0}%`;
         const fill = el('div', 'seg-fill');
+        track.append(fill);
         const txt = el('div', 'seg-text');
-        txt.append(el('span', 'seg-name', s.label), el('span', 'seg-ns', fmtNs(s.ns)));
-        seg.append(fill, txt);
+        txt.append(el('span', 'seg-name', s.label), el('span', 'seg-ns', s.ns > 0 || s.queue ? fmtNs(s.ns) : 'none'));
+        seg.append(track, txt);
         seg.title = `${s.label}: ${fmtNs(s.ns)}${s.typical ? ' (typical figure)' : s.measured ? ' (measured)' : ' (from schedule)'}`;
         bar.append(seg);
         row.els.set(s.id, { seg, fill });
-      }
+      });
       line.append(bar);
       const total = el('div', 'receipt-total', '0 ns');
       row.totalEl = total;
@@ -71,7 +76,7 @@ export class Receipt {
     }
     const legend = el('div', 'receipt-legend');
     const measured = this.timeline.trace.source === 'synthetic' ? 'illustrative software time' : 'measured by mmdecode';
-    legend.innerHTML = `<span class="key typical"></span>typical figure <span class="key measured"></span>${measured} <span class="key queue"></span>waiting behind earlier messages`;
+    legend.innerHTML = `<span class="key typical"></span>typical figure <span class="key measured"></span>${measured} <span class="key queue"></span>waiting behind earlier messages <span class="legend-note">Columns line up stage by stage; the bar inside each shows that build's share.</span>`;
     this.root.append(legend);
   }
 

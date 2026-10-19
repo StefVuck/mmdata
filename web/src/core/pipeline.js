@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { glow, label, lineMaterial, wireBox, polyline, fmtNs } from '../fx.js';
+import { glow, label, wireBox, solidBox, polyline, fmtNs } from '../fx.js';
 import { LEVELS, STAGE_TITLES, TYPE_COLORS, LANE_COLORS } from '../journey.js';
 import {
   KIND_L2, KIND_L3, KIND_DRAM, KIND_BRANCH, PHASE_NONE, PHASE_QUEUED, PHASE_STAGE, PHASE_SINK, PHASE_TX,
@@ -9,7 +9,7 @@ import {
 // one unit is one nanosecond of travel, so a stall is a real round trip to wherever the data
 // lives. L2 sits beside the core (~2 units), L3 across the die (~7), and DRAM on the DIMMs
 // out past the memory controller (~45).
-export const TRACK_Y = 0.9;
+export const TRACK_Y = 1.05;
 const CORE_Z = [-5.5, 5.5];
 const SIDE = [-1, 1];
 const STAGE_X0 = -11.2;
@@ -17,12 +17,20 @@ const STAGE_PITCH = 2.5;
 const STAGE_W = 2;
 const L2_OFFSET = 2.2;
 const L3_SLICES = Array.from({ length: 8 }, (_, k) => -10.5 + k * 2.8);
-const IMC = new THREE.Vector3(12.5, TRACK_Y, 0);
+const IMC = new THREE.Vector3(12.5, 1.3, 0);
 const DIMM_X = [34, 36.5, 39, 41.5];
 const DIMM_HALF = 14;
-const ROOT = new THREE.Vector3(-14.5, TRACK_Y, 0);
-const SLOT = new THREE.Vector3(-27, 1.2, 24);
-export const NIC_PORT = new THREE.Vector3(-39, 2.2, 24);
+const ROOT = new THREE.Vector3(-14.5, 1.3, 0);
+const SLOT = new THREE.Vector3(-21, 1.2, 15);
+const TRACE_Y = 0.05;
+// The PCIe lanes on the board, which the outgoing order follows to the card.
+const pcieTrace = (k, y = TRACE_Y) => [
+  new THREE.Vector3(ROOT.x - 1, y, -1.5 + k * 0.4),
+  new THREE.Vector3(ROOT.x - 2 - k * 0.3, y, -1.5 + k * 0.4),
+  new THREE.Vector3(ROOT.x - 2 - k * 0.3, y, SLOT.z - 2.2 + k * 0.1),
+  new THREE.Vector3(SLOT.x - 1 - k * 0.9, y, SLOT.z - 0.7),
+];
+export const NIC_PORT = new THREE.Vector3(-35, 2.2, 15);
 const QUEUE_X = -11.4;
 const QUEUE_STEP = 0.14;
 const QUEUE_SHOWN = 150;
@@ -75,6 +83,7 @@ export class Pipeline {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.laneVisible = [true, true];
+    this.laneOffset = [0, 0];
     this.focus = timeline.hero;
 
     this.buildBoard();
@@ -83,16 +92,19 @@ export class Pipeline {
     this.buildIo();
     this.buildParticles();
 
-    this.txPaths = CORE_Z.map((z) => {
+    this.txPaths = CORE_Z.map((zc, lane) => {
+      const side = SIDE[lane];
       const end = stageX(5) + STAGE_W;
+      const edge = zc + side * 2.9;
       const pts = [
-        new THREE.Vector3(end, TRACK_Y, z),
-        new THREE.Vector3(end + 0.8, TRACK_Y, z * 0.4),
-        new THREE.Vector3(ROOT.x + 2, TRACK_Y, z * 0.15),
+        new THREE.Vector3(end, TRACK_Y, zc),
+        new THREE.Vector3(end + 0.7, TRACK_Y, edge),
+        new THREE.Vector3(ROOT.x + 1.6, TRACK_Y, edge),
+        new THREE.Vector3(ROOT.x + 1.6, TRACK_Y, side * 2.4),
         ROOT.clone(),
-        new THREE.Vector3(ROOT.x - 4, 0.3, ROOT.z + 6),
-        SLOT.clone(),
-        NIC_PORT.clone(),
+        ...pcieTrace(lane ? 5 : 2, 0.25),
+        new THREE.Vector3(SLOT.x - 1 - (lane ? 5 : 2) * 0.9, 1.6, SLOT.z + 0.4),
+        NIC_PORT.clone().setZ(SLOT.z + 0.4),
       ];
       return { pts, lens: lengths(pts) };
     });
@@ -137,19 +149,19 @@ export class Pipeline {
       const x0 = -48 + rnd(k) * 104, z0 = -34 + rnd(k + 999) * 76;
       if (Math.abs(x0) < 18 && Math.abs(z0) < 14) continue;
       const dx = (rnd(k + 3) - 0.5) * 18, dz = (rnd(k + 5) - 0.5) * 12;
-      g.add(polyline([new THREE.Vector3(x0, 0.01, z0), new THREE.Vector3(x0 + dx, 0.01, z0),
-        new THREE.Vector3(x0 + dx + dz * 0.5, 0.01, z0 + dz)], 0x1f6f4a, 0.18));
+      g.add(polyline([new THREE.Vector3(x0, 0.04, z0), new THREE.Vector3(x0 + dx, 0.04, z0),
+        new THREE.Vector3(x0 + dx + dz * 0.5, 0.04, z0 + dz)], 0x1f6f4a, 0.18));
     }
   }
 
   buildDie() {
     const g = this.group;
     const pkg = new THREE.Mesh(new THREE.BoxGeometry(34, 0.4, 26),
-      new THREE.MeshStandardMaterial({ color: 0x0c1220, roughness: 0.5, metalness: 0.5 }));
+      new THREE.MeshStandardMaterial({ color: 0x0c1220, roughness: 0.5, metalness: 0.5, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
     pkg.position.set(-0.5, 0.2, 0);
     g.add(pkg);
-    const die = wireBox(28, 0.2, 19, 0x5b8cff, 0.5, 0.03);
-    die.position.set(-0.5, 0.5, 0);
+    const die = solidBox(28, 0.15, 19, 0x5b8cff, { edge: 0.5, tint: 0.08 });
+    die.position.set(-0.5, 0.475, 0);
     g.add(die);
     this.addLabel('CPU package', 'label', -16.5, 0.5, 13, [0, 0]);
 
@@ -157,20 +169,20 @@ export class Pipeline {
     CORE_Z.forEach((zc, lane) => {
       const color = LANE_COLORS[lane];
       const side = SIDE[lane];
-      const tile = wireBox(16.4, 0.3, 5.2, color, 0.45, 0.02);
-      tile.position.set(-3.6, 0.65, zc);
+      const tile = solidBox(16.4, 0.15, 5.2, color, { edge: 0.5, tint: 0.1 });
+      tile.position.set(-3.6, 0.625, zc);
       g.add(tile);
       for (let s = 0; s < 6; s++) {
-        const box = wireBox(STAGE_W, 0.5, 1.3, color, 0.65, 0.02);
+        const box = wireBox(STAGE_W, 0.5, 1.3, color, 0.45, 0);
         box.position.set(stageX(s) + STAGE_W / 2, TRACK_Y, zc);
         g.add(box);
         this.stations[lane].push(box);
       }
-      const l1 = wireBox(15, 0.12, 0.35, 0x3fd8ff, 0.35, 0.05);
+      const l1 = solidBox(15, 0.1, 0.35, 0x3fd8ff, { edge: 0.45 });
       l1.position.set(-3.6, 0.75, zc + side * 1.0);
       g.add(l1);
-      const l2 = wireBox(15, 0.35, 0.9, LEVELS[0].color, 0.6, 0.06);
-      l2.position.set(-3.6, 0.8, zc + side * L2_OFFSET);
+      const l2 = solidBox(15, 0.3, 0.9, LEVELS[0].color, { edge: 0.6 });
+      l2.position.set(-3.6, 0.85, zc + side * L2_OFFSET);
       g.add(l2);
       this.addLabel(`${lane ? 'Core 3 · tuned build' : 'Core 2 · naive build'}`, `label big ${lane ? 'tuned' : 'naive'}`,
         -12, 1.2, zc + side * 1.6, [1, 0.5]);
@@ -183,8 +195,8 @@ export class Pipeline {
     });
 
     this.slices = L3_SLICES.map((x) => {
-      const s = wireBox(2.3, 0.3, 3.2, LEVELS[1].color, 0.55, 0.04);
-      s.position.set(x, 0.75, 0);
+      const s = solidBox(2.3, 0.25, 3.2, LEVELS[1].color, { edge: 0.55 });
+      s.position.set(x, 0.675, 0);
       this.group.add(s);
       return s;
     });
@@ -200,23 +212,23 @@ export class Pipeline {
 
   buildMemory() {
     const g = this.group;
-    const imc = wireBox(2.2, 0.4, 7, 0xff4fd8, 0.7, 0.06);
-    imc.position.copy(IMC).setY(0.8);
+    const imc = solidBox(2.2, 0.4, 7, 0xff4fd8, { edge: 0.7 });
+    imc.position.copy(IMC).setY(0.75);
     g.add(imc);
     this.addLabel('Memory controller', 'label', IMC.x, 1.4, 4.4, [0.5, 0]);
     DIMM_X.forEach((x, k) => {
-      const dimm = wireBox(0.9, 3.2, DIMM_HALF * 2, 0xff4fd8, 0.55, 0.03);
+      const dimm = solidBox(0.9, 3.2, DIMM_HALF * 2, 0xff4fd8, { edge: 0.55, tint: 0.1 });
       dimm.position.set(x, 1.6, 0);
       g.add(dimm);
       for (let c = 0; c < 9; c++) {
-        const chip = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 2.2), new THREE.MeshStandardMaterial({ color: 0x15101c, roughness: 0.6 }));
+        const chip = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 2.2), new THREE.MeshStandardMaterial({ color: 0x15101c, roughness: 0.6 }));
         chip.position.set(x, 1.5, -12 + c * 3);
         g.add(chip);
       }
       for (let lane = 0; lane < 6; lane++) {
         const z = -2.5 + lane;
-        g.add(polyline([new THREE.Vector3(IMC.x + 1.1, 0.02, z), new THREE.Vector3(20 + k, 0.02, z),
-          new THREE.Vector3(26 + k, 0.02, z * (1 + k * 0.9)), new THREE.Vector3(x, 0.02, z * (1 + k * 0.9))], 0xffc44d, 0.16));
+        g.add(polyline([new THREE.Vector3(IMC.x + 1.1, TRACE_Y, z), new THREE.Vector3(20 + k, TRACE_Y, z),
+          new THREE.Vector3(26 + k, TRACE_Y, z * (1 + k * 0.9)), new THREE.Vector3(x, TRACE_Y, z * (1 + k * 0.9))], 0xffc44d, 0.16));
       }
     });
     this.addLabel('DDR5 DIMMs<span class="ns">~90 ns away</span>', 'label level', DIMM_X[1] + 1.25, 3.8, -DIMM_HALF - 1)
@@ -225,21 +237,20 @@ export class Pipeline {
 
   buildIo() {
     const g = this.group;
-    const root = wireBox(2, 0.4, 6, 0x3fd8ff, 0.7, 0.06);
-    root.position.copy(ROOT).setY(0.8);
+    const root = solidBox(2, 0.4, 6, 0x3fd8ff, { edge: 0.7 });
+    root.position.copy(ROOT).setY(0.75);
     g.add(root);
     this.addLabel('PCIe root complex', 'label cyan', ROOT.x, 1.4, -4.2);
     for (let k = 0; k < 8; k++) {
-      g.add(polyline([new THREE.Vector3(ROOT.x - 1, 0.02, -1.5 + k * 0.4), new THREE.Vector3(ROOT.x - 4 - k * 0.2, 0.02, 2 + k * 0.4),
-        new THREE.Vector3(SLOT.x + 6, 0.02, SLOT.z - 1.4 + k * 0.4), new THREE.Vector3(SLOT.x, 0.02, SLOT.z - 1.4 + k * 0.4)], 0x3fd8ff, 0.2));
+      g.add(polyline(pcieTrace(k), 0x3fd8ff, k === 2 || k === 5 ? 0.45 : 0.2));
     }
-    const slot = wireBox(16, 0.6, 1.2, 0x5b8cff, 0.5, 0.04);
+    const slot = solidBox(16, 0.6, 1.2, 0x5b8cff, { edge: 0.5 });
     slot.position.set(SLOT.x - 6, 0.3, SLOT.z);
     g.add(slot);
-    const card = wireBox(15, 4, 0.25, 0x3fffb0, 0.6, 0.04);
+    const card = solidBox(15, 4, 0.25, 0x3fffb0, { edge: 0.6, tint: 0.1 });
     card.position.set(SLOT.x - 6, 2.6, SLOT.z);
     g.add(card);
-    const sfp = wireBox(1.6, 0.8, 1, 0x9fd8ff, 0.8, 0.08);
+    const sfp = solidBox(1.6, 0.8, 1, 0x9fd8ff, { edge: 0.8 });
     sfp.position.copy(NIC_PORT);
     g.add(sfp);
     this.addLabel('Network card', 'label big', SLOT.x - 6, 5.4, SLOT.z);
@@ -259,26 +270,32 @@ export class Pipeline {
       m.count = 0;
       this.group.add(m);
     }
-    this.halo = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48), glow(0xffffff, 0.9, { side: THREE.DoubleSide }));
-    this.halo.rotation.x = -Math.PI / 2;
-    this.group.add(this.halo);
-    this.focusLabel = label('', 'label hero');
-    this.focusLabel.position.set(0, 0, -0.9);
-    this.halo.add(this.focusLabel);
+    // One marker per core, so our message can be picked out on both.
+    this.halos = [0, 1].map((lane) => {
+      const halo = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48), glow(LANE_COLORS[lane], 1, { side: THREE.DoubleSide }));
+      halo.rotation.x = -Math.PI / 2;
+      this.group.add(halo);
+      const l = label('', `label hero ${lane ? 'tuned' : 'naive'}`);
+      l.position.set(0, 0, lane ? 0.9 : -0.9);
+      l.center.set(0.5, lane ? 0 : 1);
+      halo.add(l);
+      halo.userData.label = l;
+      return halo;
+    });
   }
 
   // Where a stall sends a message: the L2 beside its core, a slice of L3, or a DIMM.
   stallTarget(e, i, stage, baseX, lane, out) {
     const h = hash(i, stage, Math.round(e.t0 * 16));
     const zc = CORE_Z[lane];
-    if (e.kind === KIND_L2) return out.set(baseX, TRACK_Y, zc + SIDE[lane] * L2_OFFSET);
+    if (e.kind === KIND_L2) return out.set(baseX, 1.25, zc + SIDE[lane] * L2_OFFSET);
     if (e.kind === KIND_L3) {
       let k = 0;
       while (k < L3_SLICES.length - 1 && L3_SLICES[k + 1] < baseX) k++;
       k = Math.max(0, Math.min(L3_SLICES.length - 1, k + Math.round((h - 0.5) * 4)));
       return out.set(L3_SLICES[k], TRACK_Y, (hash(i, stage, 3) - 0.5) * 2.4);
     }
-    return out.set(DIMM_X[Math.floor(h * DIMM_X.length)], 2.2, (hash(i, stage, 5) - 0.5) * (DIMM_HALF * 1.8));
+    return out.set(DIMM_X[Math.floor(h * DIMM_X.length)], 3.5, (hash(i, stage, 5) - 0.5) * (DIMM_HALF * 1.8));
   }
 
   // Position of message i in a lane at time t. Returns false when it isn't on screen.
@@ -355,7 +372,8 @@ export class Pipeline {
     return true;
   }
 
-  update(t, trailNs, wallTime) {
+  // laneOffset shifts one core's clock against the other, to replay them side by side.
+  update(tIn, trailNs, wallTime) {
     const tl = this.timeline;
     let nh = 0, ns = 0, nf = 0;
     const heads = this.heads, segs = this.segs, fetch = this.fetch;
@@ -366,6 +384,7 @@ export class Pipeline {
       this.focusAlive[lane] = false;
       this.focusState[lane] = null;
       if (!this.laneVisible[lane]) continue;
+      const t = tIn + this.laneOffset[lane];
       const ls = tl.lanes[lane];
       const lo = ls.firstVisible(t - trailNs);
       let hi = 0;
@@ -412,6 +431,12 @@ export class Pipeline {
                 for (const f of [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1]) add(s0 + e.t0 + e.len * f);
               }
             }
+          }
+          if (ls.outcome[i] === 2) {
+            const lens = this.txPaths[lane].lens;
+            const total = lens[lens.length - 1];
+            const tx = ls.exit[i] - ls.done[i];
+            for (const l of lens) add(ls.done[i] + (tx * l) / total);
           }
           for (let k = 1; k < SAMPLES; k++) add(b - ((b - a) * k) / SAMPLES);
           times.push(a);
@@ -490,7 +515,7 @@ export class Pipeline {
           const rb = cur * (ls.S + 1);
           active = r >= ls.rel[rb + s] && r < ls.rel[rb + s + 1];
         }
-        st[s].userData.fill.material.opacity = active ? 0.12 : 0.02;
+        st[s].userData.edges.material.opacity = active ? 1 : 0.4;
       }
     }
 
@@ -505,12 +530,12 @@ export class Pipeline {
     const orders = `Orders out (tuned)<span class="ns">${sentTotal.toLocaleString()}</span>`;
     if (this.orderLabel.element.innerHTML !== orders) this.orderLabel.element.innerHTML = orders;
 
-    const lane = this.focusAlive[1] ? 1 : this.focusAlive[0] ? 0 : -1;
-    this.halo.visible = lane >= 0;
-    if (lane >= 0) {
-      this.halo.position.copy(this.focusPos[lane]);
-      this.halo.scale.setScalar(1 + 0.15 * Math.sin(wallTime * 6));
-    }
+    this.halos.forEach((halo, lane) => {
+      halo.visible = this.focusAlive[lane];
+      if (!halo.visible) return;
+      halo.position.copy(this.focusPos[lane]);
+      halo.scale.setScalar(1 + 0.15 * Math.sin(wallTime * 6));
+    });
     this.updateStageLabels();
   }
 
@@ -541,7 +566,11 @@ export class Pipeline {
     });
     const type = String.fromCharCode(tl.trace.msgType[f]);
     const sym = tl.trace.symbols.get(tl.trace.msgLocate[f]) || '';
-    const text = f === tl.hero ? `Ours · ${type} · ${sym}` : `${type} · ${sym}`;
-    if (this.focusLabel.element.textContent !== text) this.focusLabel.element.textContent = text;
+    const what = f === tl.hero ? `Ours · ${type} · ${sym}` : `${type} · ${sym}`;
+    this.halos.forEach((halo, lane) => {
+      const text = `${what} · ${lane ? 'tuned' : 'naive'}`;
+      const el = halo.userData.label.element;
+      if (el.textContent !== text) el.textContent = text;
+    });
   }
 }

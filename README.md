@@ -48,7 +48,9 @@ Act V is a motherboard seen from above, drawn to scale with latency: one unit of
 
 Alongside, a code card shows the naive and tuned source for whichever stage our message is in. The snippets are cut from `decoder/src` at build time, so they are always the code that was measured. During a stall, the lines that touch memory light up in the colour of the level being waited on. Which line stalled is an annotation, since the counters are per stage, not per line.
 
-The act ends in free play: a slow-motion slider from real time to ×10⁹, overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both lanes.
+The act is told in beats. First a race: our message replayed on both cores at the same instant, so you can watch tuned finish all six stages and send its order while naive is still updating its book. Then the same run one stage at a time, with the code card explaining each difference. The order goes out to the network card, a wider shot shows how the naive core had also fallen behind in the burst, and the order book appears with the price level our message emptied and the order that move triggered. The receipt lines the two builds up stage by stage, so every stage is visible for both even when tuned takes a few nanoseconds.
+
+A transport bar runs along the bottom throughout: pause, a timeline you can click or drag to jump anywhere in the trace (the burst at the open, our packet and every order are marked on it), the slow-motion slider from real time to ×10⁹, and a button to skip to free play or replay the story. Touching the timeline or the slider mid-story drops you into free play at that moment. Free play adds overview, follow, memory and order book cameras, a jump to the next order, and a per-message breakdown of every stage in both builds.
 
 ## Running it
 
