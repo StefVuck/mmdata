@@ -127,6 +127,18 @@ The viewer is a static site with relative paths, so it can be served from any ho
 
 To swap in a different trace, run `make trace` before `make web`, or drop a `trace.bin` into `web/dist` after building.
 
+### Link previews
+
+The page carries Open Graph and Twitter card tags, so a shared link shows a title, a description and a 1200×630 preview image (`web/public/og.png`) in iMessage, Slack, WhatsApp, LinkedIn, X and the like. Most of those apps only fetch the image from an absolute URL, so build with the address the site will live at:
+
+```sh
+cd web && SITE_URL=https://your-domain.example/path npx vite build
+```
+
+Without `SITE_URL` the tags use relative paths: the page still works, but previews may show no image. After deploying, paste the link into a preview checker such as opengraph.xyz, or LinkedIn's Post Inspector, to confirm; most apps cache previews, so check before sharing widely.
+
+`node tools/capture_og.cjs`, with `npx vite preview` running in `web/`, regenerates the preview image from the live title screen, and the Apple touch icon from `web/public/favicon.svg`.
+
 ## Regenerating the GIFs
 
 With `npx vite preview` running in `web/` and Playwright and Pillow installed, `node tools/capture_gifs.cjs docs/media` steps the film frame by frame and rewrites the clips above. Each clip's starting beat and length are listed at the top of the script.
