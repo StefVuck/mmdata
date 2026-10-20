@@ -1,4 +1,4 @@
-# Microsecond in Slow Motion
+# A Trade in Slow Motion
 
 **Watch one market data packet become a trade.**
 

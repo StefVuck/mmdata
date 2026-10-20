@@ -190,7 +190,7 @@ body.intro #hud { opacity: 0; }
 /* Title */
 #title {
   position: fixed; inset: 0; display: grid; place-items: center;
-  background: radial-gradient(ellipse at 50% 60%, rgba(10, 30, 60, 0.55), rgba(3, 5, 10, 0.92) 70%);
+  background: #03050a;
   transition: opacity 0.9s; z-index: 5;
 }
 #title.gone { opacity: 0; pointer-events: none; }
@@ -559,4 +559,17 @@ body.act-code #receipt, body.act-code #caption { display: none; }
   #ladder { top: 70px; max-height: calc(100dvh - 190px); }
   #controls { bottom: 96px; max-height: calc(100dvh - 150px); }
   #walk { top: 64px; }
+}
+
+/* Title backdrop: the live order book, shaded where the text sits */
+#title-bg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#title-shade {
+  position: fixed; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(3,5,10,0.55) 0%, rgba(3,5,10,0.9) 22%, rgba(3,5,10,0.9) 62%, rgba(3,5,10,0.25) 80%, rgba(3,5,10,0) 100%),
+    linear-gradient(0deg, rgba(3,5,10,0.6), transparent 30%);
+}
+.title-inner { position: relative; }
+@media (max-width: 760px) {
+  #title-shade { background: linear-gradient(180deg, rgba(3,5,10,0.92) 0%, rgba(3,5,10,0.8) 55%, rgba(3,5,10,0.55) 100%); }
 }

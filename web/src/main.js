@@ -4,6 +4,7 @@ import { Timeline } from './timing.js';
 import { Director } from './director.js';
 import { TYPE_NAMES } from './journey.js';
 import { fmtNs } from './fx.js';
+import { TitleBook } from './titlebook.js';
 
 async function boot() {
   const params = new URLSearchParams(location.search);
@@ -37,6 +38,13 @@ async function boot() {
   ].filter(Boolean).join(' · ');
 
   const title = document.getElementById('title');
+  const backdrop = new TitleBook(document.getElementById('title-bg'), trace);
+  backdrop.start();
+  // Restart the backdrop whenever the title screen comes back.
+  new MutationObserver(() => {
+    if (title.classList.contains('gone')) backdrop.stop();
+    else backdrop.start();
+  }).observe(title, { attributes: true, attributeFilter: ['class'] });
   const begin = (act) => {
     title.classList.add('gone');
     document.body.classList.remove('intro');

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Microsecond in Slow Motion</title>
+    <title>A Trade in Slow Motion</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body class="intro">
@@ -13,7 +13,7 @@
 
     <div id="hud">
       <div id="brand">
-        <div class="eyebrow">Microsecond in Slow Motion</div>
+        <div class="eyebrow">A Trade in Slow Motion</div>
         <div class="act-line"><span id="act-num"></span><span id="act-title"></span></div>
       </div>
 
@@ -41,9 +41,11 @@
     <div id="walk" hidden></div>
 
     <div id="title">
+      <canvas id="title-bg"></canvas>
+      <div id="title-shade"></div>
       <div class="title-inner">
         <div class="eyebrow">An interactive explainer of low-latency trading systems</div>
-        <h1>Microsecond<br />in Slow Motion</h1>
+        <h1>A Trade<br />in Slow Motion</h1>
         <p class="lede">Where do the microseconds go between a trade on an exchange and an order coming back? Follow one market data packet through every piece of hardware and software it touches, slowed down until a single cache miss takes seconds.</p>
         <div class="title-cards">
           <div class="tcard"><div class="tn">1</div><b>The journey</b><span>Exchange, fibre, switch, network card and CPU, each drawn to scale, with a running nanosecond receipt.</span></div>
