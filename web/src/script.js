@@ -1,6 +1,7 @@
 // Runs an act as a list of beats. A beat either advances simulated time by `sim` ns at a
 // time dilation of `dilation`, or holds the clock still for `hold` wall seconds.
 // `sim` and `dilation` may be functions, resolved when the beat starts.
+import { sound } from './audio.js';
 
 // The whole story runs a fifth slower than the beats are written, to leave time to read.
 export const PACE = 1.2;
@@ -21,6 +22,7 @@ export class Script {
     this.started = false;
     this.dilation = this.initialDilation;
     this.cur = null;
+    this.lastCaption = null;
   }
 
   get beat() {
@@ -54,9 +56,30 @@ export class Script {
     this.cur.caption = val(b.caption);
     if (this.cur.hold != null) this.cur.hold *= PACE;
     if (this.cur.dilation) this.cur.dilation *= PACE;
+    this.fitNarration();
     if (b.snapDilation && this.cur.dilation) this.dilation = this.cur.dilation;
     this.started = true;
     if (b.onStart) b.onStart();
+  }
+
+  // A beat lasts at least as long as its narration. Moving beats slow down to fit; anything
+  // still short waits at the end.
+  fitNarration() {
+    const c = this.cur;
+    const fresh = c.caption && c.caption !== this.lastCaption;
+    this.lastCaption = c.caption;
+    const said = fresh ? sound.seconds(c.caption) : 0;
+    if (!said) return;
+    const need = said + 0.8;
+    if (c.hold != null) {
+      c.hold = Math.max(c.hold, need);
+      return;
+    }
+    c.minWall = need;
+    if (c.sim > 0 && c.dilation) {
+      const wall = (c.sim * c.dilation) / 1e9;
+      if (wall < need) c.dilation *= need / wall;
+    }
   }
 
   finish() {
@@ -92,6 +115,11 @@ export class Script {
       const ds = (dt * 1e9) / this.dilation;
       const left = c.sim - this.beatSim;
       if (ds >= left) {
+        if (this.beatWall < (c.minWall || 0)) {
+          this.sim += left;
+          this.beatSim = c.sim;
+          return;
+        }
         this.beatSim = c.sim;
         this.sim += left;
         this.finish();

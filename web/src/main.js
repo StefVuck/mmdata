@@ -5,6 +5,7 @@ import { Director } from './director.js';
 import { TYPE_NAMES } from './journey.js';
 import { fmtNs } from './fx.js';
 import { TitleBook } from './titlebook.js';
+import { sound } from './audio.js';
 
 async function boot() {
   const params = new URLSearchParams(location.search);
@@ -45,7 +46,27 @@ async function boot() {
     if (title.classList.contains('gone')) backdrop.stop();
     else backdrop.start();
   }).observe(title, { attributes: true, attributeFilter: ['class'] });
+  // Browsers only start audio after a click or key press, so the first one unlocks it.
+  const unlock = () => sound.unlock();
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  const titleSound = document.getElementById('title-sound-btn');
+  const titleSoundUi = () => {
+    const on = sound.narrationOn || sound.ambienceOn;
+    titleSound.textContent = on ? 'Sound on' : 'Sound off';
+    titleSound.classList.toggle('on', on);
+  };
+  titleSound.addEventListener('click', () => {
+    const on = !(sound.narrationOn || sound.ambienceOn);
+    sound.setNarration(on);
+    sound.setAmbience(on);
+    titleSoundUi();
+    director.soundUi();
+  });
+  titleSoundUi();
+
   const begin = (act) => {
+    sound.unlock();
     title.classList.add('gone');
     document.body.classList.remove('intro');
     director.start(act);

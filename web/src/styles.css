@@ -61,6 +61,10 @@ body.intro #hud { opacity: 0; }
 .act-line { margin-top: 6px; display: flex; gap: 12px; align-items: baseline; }
 #act-num { font-family: var(--mono); color: var(--cyan); font-size: 15px; }
 #act-title { font-size: 26px; font-weight: 300; letter-spacing: 0.01em; }
+#sound-ctl { margin-top: 10px; display: flex; gap: 6px; pointer-events: auto; }
+#sound-ctl .chip { font-size: 11px; padding: 3px 9px; opacity: 0.8; }
+#sound-ctl .chip.on { opacity: 1; }
+#title-sound { margin-top: 14px; font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 10px; }
 
 #act-nav {
   position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
@@ -470,6 +474,8 @@ body.act-code #receipt, body.act-code #caption { display: none; }
   #brand .eyebrow { display: none; }
   .act-line { margin-top: 0; gap: 8px; }
   #act-title { font-size: 17px; }
+  #sound-ctl { margin-top: 6px; }
+  #sound-ctl .chip { font-size: 10px; padding: 2px 8px; }
   #act-num { font-size: 12px; }
   #readout { top: max(8px, env(safe-area-inset-top)); left: auto; right: 12px; max-width: 55vw; text-align: right; }
   #dilation { font-size: 20px; }
