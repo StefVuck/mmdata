@@ -166,7 +166,7 @@ export class CoreAct extends Act {
     const root = document.getElementById('controls');
     this.controls = root;
     root.innerHTML = `
-      <h3>Free play</h3>
+      <h3 class="ctl-toggle">Free play <span class="ctl-caret"></span></h3>
       <div class="ctl-row"><label>Lanes</label><div class="chips"><button class="chip lane-0 on" data-lane="0">Naive</button><button class="chip lane-1 on" data-lane="1">Tuned</button></div></div>
       <div class="ctl-row"><label>Camera</label><div class="chips">
         <button class="chip" data-cam="follow">Follow</button><button class="chip" data-cam="overview">Overview</button>
@@ -174,6 +174,7 @@ export class CoreAct extends Act {
       <div class="ctl-row"><label>Jump to</label><div class="chips"><button class="chip" id="ctl-next">Next order</button><button class="chip" id="ctl-hero">Featured message</button></div></div>
       <div class="ctl-row"><label></label><button class="chip on" id="ctl-code">Act VI: read the code →</button></div>
       <div class="ctl-row"><label>Panel</label><div class="chips"><button class="chip on" data-panel="code">Code</button><button class="chip" data-panel="numbers">Numbers</button></div></div>`;
+    root.querySelector('.ctl-toggle').addEventListener('click', () => root.classList.toggle('open'));
     root.querySelectorAll('[data-lane]').forEach((b) => b.addEventListener('click', () => {
       const l = Number(b.dataset.lane);
       this.pipeline.laneVisible[l] = !this.pipeline.laneVisible[l];
@@ -490,6 +491,11 @@ export class CoreAct extends Act {
       const c = CAMERAS[mode];
       pos.set(...c.pos);
       look.set(...c.look);
+    }
+    // The board is wide; in portrait, back the camera off along its line of sight to fit it.
+    if (this.camera.aspect < 1) {
+      const k = 1 - this.camera.aspect;
+      pos.sub(look).multiplyScalar(1 + 1.7 * k).add(look);
     }
     this.follow.update(dt, pos, look);
   }

@@ -193,8 +193,6 @@ export class ExchangeAct extends Act {
   enter() {
     super.enter();
     this.follow.snap = true;
-    this.camera.fov = 50;
-    this.camera.updateProjectionMatrix();
   }
 
   update(dt) {

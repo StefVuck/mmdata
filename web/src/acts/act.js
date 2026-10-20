@@ -31,7 +31,17 @@ export class Act {
   }
 
   resize(aspect) {
+    const design = 16 / 9;
+    const base = 50;
+    const fov = aspect >= design ? base
+      : (2 * Math.atan(Math.tan((base * Math.PI) / 360) * (design / aspect)) * 180) / Math.PI;
+    this.camera.fov = Math.min(fov, 96);
     this.camera.aspect = aspect;
+    // In portrait the captions and controls fill the bottom of the screen, so centre the
+    // scene in the space above them.
+    const w = window.innerWidth, h = window.innerHeight;
+    if (aspect < 1) this.camera.setViewOffset(w, h, 0, h * 0.17, w, h);
+    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
 
