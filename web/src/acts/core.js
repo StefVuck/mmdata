@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Act } from './act.js';
 import { Script } from '../script.js';
-import { Follow, smooth, lerp, fmtNs, fmtDilation, dust } from '../fx.js';
+import { Follow, smooth, lerp, fmtNs, fmtDilation, dust, isNarrow } from '../fx.js';
 import { Pipeline } from '../core/pipeline.js';
 import { CodeCard } from '../code.js';
 import { TX_NS } from '../timing.js';
@@ -70,11 +70,11 @@ export class CoreAct extends Act {
           let s = 0;
           const rb = hero * (naive.S + 1);
           while (s < naive.S - 1 && naive.rel[rb + s + 1] <= tunedNs) s++;
-          return `First, a race. The featured message on both cores, starting at the same instant. Tuned runs all six stages in <b>${fmtNs(tunedNs)}</b>. At that moment naive is still in its <em>${STAGE_TITLES[s]}</em> stage, and needs <b>${fmtNs(service(naive))}</b> in all. The numbers above each stage are the two builds' times.`;
+          return `First, a race. The featured message on both cores, starting at the same instant. Tuned runs all six stages in <b>${fmtNs(tunedNs)}</b>. At that moment naive is still in its <em>${STAGE_TITLES[s]}</em> stage, and needs <b>${fmtNs(service(naive))}</b> in all. ${isNarrow() ? 'The receipt at the bottom compares them stage by stage.' : 'The numbers above each stage are the two builds\' times.'}`;
         } },
       { id: 'detail', sim: () => tuned.done[hero] - this.tStart, dilation: () => dil(tuned.done[hero] - this.tStart, 16, 2e7, 2e9),
         onStart: at(this.tStart),
-        caption: () => `Now why, one stage at a time. The card on the left shows both builds' code for the stage the featured message is in. Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L2 sits beside the core, L3 across the die, and DRAM out on the DIMMs.` },
+        caption: () => `Now why, one stage at a time. ${isNarrow() ? 'Act VI walks through the code behind each stage.' : 'The card on the left shows both builds\' code for the stage the featured message is in.'} Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L2 sits beside the core, L3 across the die, and DRAM out on the DIMMs.` },
       { id: 'out', sim: TX_NS, dilation: 1.2e8, onStart: at(tuned.done[hero]),
         caption: () => `Signal fired, risk passed, order encoded: <b>${order}</b>. It leaves the way the packet came in: across the die to the PCIe root complex, down the lanes to the network card and onto the wire, about 600 ns (a typical figure). Tick to trade, tuned: <b>${fmtNs(ttt(1))}</b>.` },
       { id: 'naive', sim: () => Math.max(1, naive.done[hero] + TX_NS - this.t), dilation: () => dil(naive.done[hero] + TX_NS - this.t, 11, 1e3, 2e9),
@@ -344,6 +344,7 @@ export class CoreAct extends Act {
     this.inspector.hidden = true;
     this.code.setVisible(false);
     this.transport.hidden = true;
+    document.getElementById('next-up').hidden = true;
     document.getElementById('legend').hidden = true;
     document.getElementById('ladder').hidden = true;
     document.body.classList.remove('has-transport');
@@ -351,11 +352,20 @@ export class CoreAct extends Act {
 
   startFree() {
     if (this.mode === 'free') return;
+    if (this.script.done) this.showNext();
     this.mode = 'free';
     this.pipeline.laneOffset[0] = 0;
     this.freeDilation = this.script.dilation;
     this.controls.hidden = false;
     this.setCamera(this.script.done ? 'overview' : this.camMode === 'follow' ? 'follow' : 'overview');
+  }
+
+  // When the story ends, point to Act VI, which is easy to miss on a small screen.
+  showNext() {
+    const el = document.getElementById('next-up');
+    el.hidden = false;
+    el.querySelector('[data-next="code"]').onclick = () => { el.hidden = true; this.ctx.director.go(5); };
+    el.querySelector('[data-next="stay"]').onclick = () => { el.hidden = true; };
   }
 
   key(e) {
@@ -397,6 +407,7 @@ export class CoreAct extends Act {
     }
     const wall = performance.now() / 1000;
     const trail = (TRAIL_WALL * 1e9) / this.dilation;
+    this.pipeline.setCompact(isNarrow(), this.mode === 'free' || this.script.id === 'overload');
     this.pipeline.update(this.t, trail, wall);
     const id = this.mode === 'script' ? this.script.id : null;
     document.getElementById('ladder').hidden = id !== 'book';

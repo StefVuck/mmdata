@@ -573,3 +573,25 @@ body.act-code #receipt, body.act-code #caption { display: none; }
 @media (max-width: 760px) {
   #title-shade { background: linear-gradient(180deg, rgba(3,5,10,0.92) 0%, rgba(3,5,10,0.8) 55%, rgba(3,5,10,0.55) 100%); }
 }
+
+/* End-of-story card pointing to Act VI */
+#next-up {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px));
+  pointer-events: auto; z-index: 3; background: rgba(6, 10, 20, 0.94); border: 1px solid rgba(63, 216, 255, 0.5);
+  border-radius: 16px; padding: 20px 22px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); animation: pop 0.4s ease-out;
+}
+#next-up[hidden] { display: none; }
+#next-up b { display: block; font-size: 20px; font-weight: 400; margin: 6px 0 8px; }
+#next-up p { font-size: 14px; line-height: 1.5; color: #c3d2ea; margin: 0 0 16px; }
+.next-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.next-buttons button { padding: 10px 16px; }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, -46%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+/* A brief hint that the camera can be moved */
+#orbit-hint {
+  position: absolute; left: 50%; top: 92px; transform: translateX(-50%); font-size: 11px; color: var(--dim);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; white-space: nowrap;
+  opacity: 0; transition: opacity 0.6s;
+}
+body.show-orbit-hint #orbit-hint { opacity: 1; }
+@media (max-width: 760px) { #orbit-hint { top: calc(max(10px, env(safe-area-inset-top)) + 128px); font-size: 10px; } }

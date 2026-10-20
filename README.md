@@ -79,6 +79,7 @@ A trace from the synthetic feed, timed on x86 Linux, is committed in `web/public
 | N | jump to the next order (free play) |
 | H | hide the overlay for a clean recording |
 | R | replay from the start |
+| Drag, scroll, pinch | orbit and zoom the camera in any 3D act; double-click or double-tap resets |
 
 A few URL parameters help with recordings and sharing a particular moment:
 

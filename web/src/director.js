@@ -6,7 +6,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import { Hud } from './ui.js';
-import { smooth } from './fx.js';
+import { smooth, attachOrbit, resetUserView } from './fx.js';
 import { ExchangeAct } from './acts/exchange.js';
 import { FibreAct } from './acts/fibre.js';
 import { SwitchAct } from './acts/switch.js';
@@ -27,6 +27,7 @@ export class Director {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     stage.appendChild(this.renderer.domElement);
+    attachOrbit(this.renderer.domElement);
 
     this.labels = new CSS2DRenderer({ element: document.getElementById('labels') });
     this.labels.setSize(window.innerWidth, window.innerHeight);
@@ -92,12 +93,17 @@ export class Director {
 
   switchTo(i) {
     if (this.act) this.act.exit();
+    resetUserView();
     this.current = i;
     const act = this.act;
     this.hud.receipt.clear();
     for (let k = 0; k < i; k++) this.acts[k].completeReceipt();
     act.resize(window.innerWidth / window.innerHeight);
     act.enter();
+    // Remind the viewer the camera is theirs to move, for a few seconds in each 3D act.
+    clearTimeout(this.hintTimer);
+    document.body.classList.toggle('show-orbit-hint', i < 5);
+    this.hintTimer = setTimeout(() => document.body.classList.remove('show-orbit-hint'), 4500);
     this.renderPass.scene = act.scene;
     this.renderPass.camera = act.camera;
     this.bloom.strength = act.bloomStrength ?? 0.6;

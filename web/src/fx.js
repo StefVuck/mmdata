@@ -125,6 +125,65 @@ export class Comet {
   }
 }
 
+export const isNarrow = () => window.innerWidth < 760;
+
+// The viewer's own adjustment to every scripted camera: an orbit around whatever the shot is
+// looking at, and a zoom along the line of sight.
+export const userView = { yaw: 0, pitch: 0, zoom: 1, touched: false };
+
+export function resetUserView() {
+  userView.yaw = 0;
+  userView.pitch = 0;
+  userView.zoom = 1;
+}
+
+export function attachOrbit(el) {
+  const pointers = new Map();
+  let pinch = 0;
+  let lastTap = 0;
+  el.style.touchAction = 'none';
+  el.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    el.setPointerCapture(e.pointerId);
+    const now = performance.now();
+    if (now - lastTap < 300) resetUserView();
+    lastTap = now;
+  });
+  el.addEventListener('pointermove', (e) => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    if (pointers.size === 1) {
+      userView.yaw -= (e.clientX - p.x) * 0.006;
+      userView.pitch -= (e.clientY - p.y) * 0.006;
+      userView.touched = true;
+    }
+    p.x = e.clientX;
+    p.y = e.clientY;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch) userView.zoom = Math.min(4, Math.max(0.25, userView.zoom * (pinch / d)));
+      pinch = d;
+      userView.touched = true;
+    }
+  });
+  const up = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = 0;
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    userView.zoom = Math.min(4, Math.max(0.25, userView.zoom * Math.exp(e.deltaY * 0.001)));
+    userView.touched = true;
+  }, { passive: false });
+  el.addEventListener('dblclick', resetUserView);
+}
+
+const orbitSph = new THREE.Spherical();
+const orbitV = new THREE.Vector3();
+
 // Critically damped follow for cameras.
 export class Follow {
   constructor(camera, stiffness = 3) {
@@ -135,6 +194,7 @@ export class Follow {
     this.snap = true;
   }
   update(dt, position, lookAt) {
+    this.prepare();
     if (this.snap) {
       this.camera.position.copy(position);
       this.look.copy(lookAt);
@@ -144,7 +204,29 @@ export class Follow {
       this.camera.position.lerp(position, a);
       this.look.lerp(lookAt, Math.min(1, a * 1.6));
     }
+    // Apply the viewer's orbit and zoom on top of the scripted shot.
+    if (userView.yaw || userView.pitch || userView.zoom !== 1) {
+      orbitV.subVectors(this.camera.position, this.look);
+      orbitSph.setFromVector3(orbitV);
+      orbitSph.theta += userView.yaw;
+      orbitSph.phi = Math.min(Math.PI - 0.05, Math.max(0.05, orbitSph.phi + userView.pitch));
+      orbitSph.radius *= userView.zoom;
+      this.applied = orbitV.setFromSpherical(orbitSph).add(this.look);
+      this.base = this.base || new THREE.Vector3();
+      this.base.copy(this.camera.position);
+      this.camera.position.copy(this.applied);
+      this.camera.lookAt(this.look);
+      // Keep the smoothing working from the scripted position, not the orbited one.
+      this.restore = true;
+      return;
+    }
+    this.restore = false;
     this.camera.lookAt(this.look);
+  }
+
+  // Call before the next update when an orbit was applied, so lerping starts from the script.
+  prepare() {
+    if (this.restore && this.base) this.camera.position.copy(this.base);
   }
 }
 
