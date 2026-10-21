@@ -1,3 +1,131 @@
 {
-  "lines": {}
+  "voice": "nPczCjzI2devNBz1zQrb",
+  "model": "eleven_multilingual_v2",
+  "lines": {
+    "7bb5e2cb": {
+      "file": "7bb5e2cb.mp3",
+      "seconds": 6.32,
+      "text": "An exchange data centre. Hundreds of trading firms rent racks a few metres from the one machine that matters."
+    },
+    "b1ad8a71": {
+      "file": "b1ad8a71.mp3",
+      "seconds": 5.67,
+      "text": "Inside the matching engine, an incoming sell order meets a resting buy. That is the trade."
+    },
+    "88bc572e": {
+      "file": "88bc572e.mp3",
+      "seconds": 5.9,
+      "text": "The exchange publishes the execution as a multicast itch packet, to every subscriber at once."
+    },
+    "296a42a2": {
+      "file": "296a42a2.mp3",
+      "seconds": 6.32,
+      "text": "At the meet-me room it is handed to the trading firm’s cross-connect. From here, every nanosecond goes on the receipt."
+    },
+    "1c137d21": {
+      "file": "1c137d21.mp3",
+      "seconds": 7.71,
+      "text": "The trading firm’s cross-connect: 100 metres of single-mode fibre. Light in glass covers one metre every 4.9 nanoseconds."
+    },
+    "2f43efa2": {
+      "file": "2f43efa2.mp3",
+      "seconds": 9.89,
+      "text": "Exchanges give every firm the same length of cable, so a firm whose rack is close is handed a spool of extra fibre. Proximity buys nothing here."
+    },
+    "45e93b46": {
+      "file": "45e93b46.mp3",
+      "seconds": 6.13,
+      "text": "Slowed thirty million times, light is moving at 6.8 metres per second, about as fast as a sprinter."
+    },
+    "6b319c2e": {
+      "file": "6b319c2e.mp3",
+      "seconds": 8.31,
+      "text": "The firm’s switch is a layer 1 switch. It never reads the packet. It repeats the signal, electrically, to every port that subscribes."
+    },
+    "6b848417": {
+      "file": "6b848417.mp3",
+      "seconds": 5.94,
+      "text": "Five nanoseconds, port to port. The conventional switch above is still taking the frame into its buffer."
+    },
+    "0cfb6c65": {
+      "file": "0cfb6c65.mp3",
+      "seconds": 4.37,
+      "text": "Three metres of patch cord to the trading server: another fifteen nanoseconds."
+    },
+    "7f4cc12a": {
+      "file": "7f4cc12a.mp3",
+      "seconds": 1.44,
+      "text": "Into the network card."
+    },
+    "16a39ddc": {
+      "file": "16a39ddc.mp3",
+      "seconds": 4.92,
+      "text": "The optic turns light back into an electrical signal, and the fy recovers the bits."
+    },
+    "a59b8cdc": {
+      "file": "a59b8cdc.mp3",
+      "seconds": 9.52,
+      "text": "Ethernet, IP and U D P headers come off. Inside the Mold U D P sixty-four packet are 7 itch messages, including the featured message."
+    },
+    "c5bb7f20": {
+      "file": "c5bb7f20.mp3",
+      "seconds": 11.61,
+      "text": "Kernel bypass: the card writes the messages straight into a ring buffer in the trading process’s memory over P C I express. No interrupt, no system call, no copy."
+    },
+    "2e1b4bcc": {
+      "file": "2e1b4bcc.mp3",
+      "seconds": 6.97,
+      "text": "Core 3 does nothing but spin on that ring. On its next check it sees the new slot, and picks up the featured message."
+    },
+    "f0dc6d8d": {
+      "file": "f0dc6d8d.mp3",
+      "seconds": 19.41,
+      "text": "Inside the CPU. The packet's 7 messages land in the ring buffer, which the network card writes straight into L three. Two builds of the same trading code read it, each on its own core: naive on core 2, tuned on core 3. Both run the same six stages and reach the same decision."
+    },
+    "57ceba78": {
+      "file": "57ceba78.mp3",
+      "seconds": 18.39,
+      "text": "First, a race. The featured message on both cores, starting at the same instant. Tuned runs all six stages in 89 nanoseconds. At that moment naive is still in its Book stage, and needs 863 nanoseconds in all. The numbers above each stage are the two builds' times."
+    },
+    "d3732443": {
+      "file": "d3732443.mp3",
+      "seconds": 20.53,
+      "text": "Now why, one stage at a time. The card on the left shows both builds' code for the stage the featured message is in. Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L two sits beside the core, L three across the die, and D-RAM out on the dims."
+    },
+    "1ce473cd": {
+      "file": "1ce473cd.mp3",
+      "seconds": 23.68,
+      "text": "Signal fired, risk passed, order encoded: SELL 100 NOVA at 181.45. It leaves the way the packet came in: across the die to the P C I express root complex, down the lanes to the network card and onto the wire, about 600 nanoseconds (a typical figure). Tick to trade, tuned: 1.75 microseconds."
+    },
+    "b7e98854": {
+      "file": "b7e98854.mp3",
+      "seconds": 17.97,
+      "text": "In the real run it was worse than the race suggests. The naive core was still working through the burst that arrived before this packet, and only reached the featured message 1.15 microseconds after it landed. Slow code doesn't just take longer: it falls behind, and then everything waits."
+    },
+    "952a3f8a": {
+      "file": "952a3f8a.mp3",
+      "seconds": 33.58,
+      "text": "Being slow has a worse failure than lateness. Go back to the open: for its first 3 milliseconds, an exaggerated surge, messages arrive faster than the naive build can process them. Its ring buffer of 512 packets fills, and the network card drops every packet that won't fit: 520 packets, 6,038 messages, shown in red. Each one is a hole in its order book, which stays wrong until the gap is recovered. The tuned build's ring never held more than 4 packets."
+    },
+    "453ababb": {
+      "file": "453ababb.mp3",
+      "seconds": 25.77,
+      "text": "What all six stages were working out. The Book stage keeps the order book: the shares waiting to buy (bids) and sell (asks) at each price. The featured message was a trade that took every share at the best bid, 181.46, so the best price moved to 181.45. That move is the signal, and the strategy sells 100 shares at the new price."
+    },
+    "27f5ec85": {
+      "file": "27f5ec85.mp3",
+      "seconds": 24.29,
+      "text": "Same packet, same machine, same decision. Naive: 3.67 microseconds, tuned: 1.75 microseconds, and the receipt below breaks down every nanosecond. In the surge, naive also lost 520 packets. Act VI looks at the code itself. Or explore here: drag the timeline, change the slow motion, or follow the next order."
+    },
+    "31bb3887": {
+      "file": "31bb3887.mp3",
+      "seconds": 19.41,
+      "text": "First, a race. The featured message on both cores, starting at the same instant. Tuned runs all six stages in 89 nanoseconds. At that moment naive is still in its Book stage, and needs 863 nanoseconds in all. The receipt at the bottom compares them stage by stage."
+    },
+    "b6c0b047": {
+      "file": "b6c0b047.mp3",
+      "seconds": 18.53,
+      "text": "Now why, one stage at a time. Act VI walks through the code behind each stage. Each trip off the core is a cache miss, drawn to scale: one unit of board is one nanosecond, so L two sits beside the core, L three across the die, and D-RAM out on the dims."
+    }
+  }
 }
