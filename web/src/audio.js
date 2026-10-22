@@ -29,6 +29,7 @@ export class Sound {
     this.manifest = {};
     this.current = null;
     this.currentText = '';
+    this.buffers = new Map();
     this.ctx = null;
     this.beds = [];
     this.act = -1;
@@ -62,7 +63,11 @@ export class Sound {
     if (this.ctx) return this.ctx.resume();
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
+    // Safari: let Web Audio play with the iPhone's ringer switch on silent, like a video would.
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
     this.ctx = new AC();
+    this.voice = this.ctx.createGain();
+    this.voice.connect(this.ctx.destination);
     this.master = this.ctx.createGain();
     this.master.gain.value = this.ambienceOn ? 1 : 0;
     this.master.connect(this.ctx.destination);
@@ -74,6 +79,20 @@ export class Sound {
       return out;
     });
     if (this.act >= 0) this.setAct(this.act);
+    if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+    Object.values(this.manifest).forEach((rec) => this.buffer(rec.file));
+  }
+
+  // Narration plays through Web Audio rather than <audio> elements: Safari only lets an element
+  // start with sound inside a click, but a context unlocked by one click stays unlocked.
+  buffer(file) {
+    if (!this.buffers.has(file)) {
+      this.buffers.set(file, fetch(`audio/${file}`)
+        .then((r) => r.arrayBuffer())
+        .then((b) => this.ctx.decodeAudioData(b))
+        .catch(() => { this.buffers.delete(file); return null; }));
+    }
+    return this.buffers.get(file);
   }
 
   setAct(i) {
@@ -113,11 +132,18 @@ export class Sound {
     if (!text) return;
     const rec = this.manifest[lineKey(text)];
     if (rec) {
-      const a = new Audio(`audio/${rec.file}`);
-      a.onended = () => this.duck(false);
-      a.play().catch(() => {});
-      this.current = a;
+      const line = { node: null };
+      this.current = line;
       this.duck(true);
+      this.buffer(rec.file).then((buf) => {
+        if (this.current !== line || !buf) return;
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(this.voice);
+        src.onended = () => { if (this.current === line) this.duck(false); };
+        src.start();
+        line.node = src;
+      });
     } else if ('speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(text);
       const voices = speechSynthesis.getVoices();
@@ -132,18 +158,15 @@ export class Sound {
   }
 
   stop() {
-    if (this.current instanceof Audio) this.current.pause();
-    else if (this.current === 'synth') speechSynthesis.cancel();
+    if (this.current === 'synth') speechSynthesis.cancel();
+    else if (this.current && this.current.node) this.current.node.stop();
     this.current = null;
     this.currentText = '';
     this.duck(false);
   }
 
   pause(paused) {
-    if (this.current instanceof Audio) {
-      if (paused) this.current.pause();
-      else this.current.play().catch(() => {});
-    } else if (this.current === 'synth') {
+    if (this.current === 'synth') {
       if (paused) speechSynthesis.pause();
       else speechSynthesis.resume();
     }

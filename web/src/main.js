@@ -48,8 +48,7 @@ async function boot() {
   }).observe(title, { attributes: true, attributeFilter: ['class'] });
   // Browsers only start audio after a click or key press, so the first one unlocks it.
   const unlock = () => sound.unlock();
-  window.addEventListener('pointerdown', unlock, { once: true });
-  window.addEventListener('keydown', unlock, { once: true });
+  for (const ev of ['pointerdown', 'click', 'touchend', 'keydown']) window.addEventListener(ev, unlock, { once: true });
   const titleSound = document.getElementById('title-sound-btn');
   const titleSoundUi = () => {
     const on = sound.narrationOn || sound.ambienceOn;
