@@ -6,7 +6,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import { Hud } from './ui.js';
-import { smooth } from './fx.js';
+import { sound } from './audio.js';
+import { smooth, attachOrbit, resetUserView } from './fx.js';
 import { ExchangeAct } from './acts/exchange.js';
 import { FibreAct } from './acts/fibre.js';
 import { SwitchAct } from './acts/switch.js';
@@ -22,11 +23,12 @@ export class Director {
     this.timeline = timeline;
     const stage = document.getElementById('stage');
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 760 ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     stage.appendChild(this.renderer.domElement);
+    attachOrbit(this.renderer.domElement);
 
     this.labels = new CSS2DRenderer({ element: document.getElementById('labels') });
     this.labels.setSize(window.innerWidth, window.innerHeight);
@@ -39,6 +41,11 @@ export class Director {
     this.whiteout = document.getElementById('whiteout');
     this.pauseBtn = document.getElementById('pause-btn');
     this.pauseBtn.addEventListener('click', () => { this.paused = !this.paused; });
+    this.voiceBtn = document.getElementById('voice-btn');
+    this.ambBtn = document.getElementById('amb-btn');
+    this.voiceBtn.addEventListener('click', () => this.toggleVoice());
+    this.ambBtn.addEventListener('click', () => this.toggleAmbience());
+    this.soundUi();
 
     const ctx = { timeline, hud: this.hud, director: this };
     this.acts = [new ExchangeAct(ctx), new FibreAct(ctx), new SwitchAct(ctx), new NicAct(ctx), new CoreAct(ctx), new CodeWalkAct(ctx)];
@@ -61,6 +68,23 @@ export class Director {
     window.addEventListener('keydown', (e) => this.key(e));
   }
 
+  toggleVoice() {
+    sound.setNarration(!sound.narrationOn);
+    this.soundUi();
+  }
+
+  toggleAmbience() {
+    sound.setAmbience(!sound.ambienceOn);
+    this.soundUi();
+  }
+
+  soundUi() {
+    this.voiceBtn.textContent = sound.narrationOn ? 'Voice on' : 'Voice off';
+    this.voiceBtn.classList.toggle('on', sound.narrationOn);
+    this.ambBtn.textContent = sound.ambienceOn ? 'Ambience on' : 'Ambience off';
+    this.ambBtn.classList.toggle('on', sound.ambienceOn);
+  }
+
   get act() {
     return this.acts[this.current];
   }
@@ -76,6 +100,8 @@ export class Director {
     this.current = -1;
     this.transition = null;
     this.paused = false;
+    sound.stop();
+    sound.setAct(-1);
     this.renderer.setAnimationLoop(null);
     document.getElementById('title').classList.remove('gone');
     document.body.classList.add('intro');
@@ -92,12 +118,18 @@ export class Director {
 
   switchTo(i) {
     if (this.act) this.act.exit();
+    resetUserView();
     this.current = i;
+    sound.setAct(i);
     const act = this.act;
     this.hud.receipt.clear();
     for (let k = 0; k < i; k++) this.acts[k].completeReceipt();
     act.resize(window.innerWidth / window.innerHeight);
     act.enter();
+    // Remind the viewer the camera is theirs to move, for a few seconds in each 3D act.
+    clearTimeout(this.hintTimer);
+    document.body.classList.toggle('show-orbit-hint', i < 5);
+    this.hintTimer = setTimeout(() => document.body.classList.remove('show-orbit-hint'), 4500);
     this.renderPass.scene = act.scene;
     this.renderPass.camera = act.camera;
     this.bloom.strength = act.bloomStrength ?? 0.6;
@@ -110,6 +142,8 @@ export class Director {
     if (e.code === 'Space') { this.paused = !this.paused; e.preventDefault(); }
     else if (e.code === 'ArrowRight') this.go(this.current + 1);
     else if (e.code === 'ArrowLeft') this.go(this.current - 1, { portal: false });
+    else if (e.code === 'KeyV') this.toggleVoice();
+    else if (e.code === 'KeyM') this.toggleAmbience();
     else if (e.code === 'KeyH') document.getElementById('hud').classList.toggle('hidden');
     else if (e.code === 'KeyR') this.go(0, { portal: false });
     else if (/^Digit[1-6]$/.test(e.code)) this.go(Number(e.code.slice(5)) - 1, { portal: false });
@@ -160,6 +194,9 @@ export class Director {
     this.hud.setClock(a.clockText);
     this.hud.setStat(a.stat);
     this.hud.setCaption(a.caption || (this.paused ? 'Paused' : null));
+    if (this.paused !== this.wasPaused) sound.pause(this.paused);
+    this.wasPaused = this.paused;
+    if (!this.paused && (!this.transition || this.transition.phase === 'in')) sound.say(a.caption);
     this.hud.setProgress(this.current, a.storyProgress);
     this.hud.caption.classList.toggle('paused', this.paused);
     const label = this.paused ? '▶ Play' : '❚❚ Pause';

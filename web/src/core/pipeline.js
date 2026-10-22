@@ -165,7 +165,8 @@ export class Pipeline {
     const die = solidBox(28, 0.15, 19, 0x5b8cff, { edge: 0.5, tint: 0.08 });
     die.position.set(-0.5, 0.475, 0);
     g.add(die);
-    this.addLabel('CPU package', 'label', -16.5, 0.5, 13, [0, 0]);
+    this.minor = [];
+    this.minor.push(this.addLabel('CPU package', 'label', -16.5, 0.5, 13, [0, 0]));
 
     this.stations = [[], []];
     CORE_Z.forEach((zc, lane) => {
@@ -188,10 +189,11 @@ export class Pipeline {
       g.add(l2);
       this.addLabel(`${lane ? 'Core 3 · tuned build' : 'Core 2 · naive build'}`, `label big ${lane ? 'tuned' : 'naive'}`,
         -12, 1.2, zc + side * 1.6, [1, 0.5]);
-      this.addLabel('L2<span class="ns">~4 ns</span>', 'label level', 4.6, 0.9, zc + side * L2_OFFSET, [0, 0.5])
-        .element.style.color = '#4f9dff';
-      this.addLabel('L1d<span class="ns">~1 ns</span>', 'label level', 4.6, 0.9, zc + side * 1.0, [0, 0.5])
-        .element.style.color = '#3fd8ff';
+      const l2Label = this.addLabel('L2<span class="ns">~4 ns</span>', 'label level', 4.6, 0.9, zc + side * L2_OFFSET, [0, 0.5]);
+      l2Label.element.style.color = '#4f9dff';
+      const l1Label = this.addLabel('L1d<span class="ns">~1 ns</span>', 'label level', 4.6, 0.9, zc + side * 1.0, [0, 0.5]);
+      l1Label.element.style.color = '#3fd8ff';
+      this.minor.push(l2Label, l1Label);
       const q = this.addLabel('', `label ring ${lane ? 'tuned' : 'naive'}`, ROOT.x - 2.5, 1.3, side * 4, [1, 0.5]);
       this.stations[lane].queueLabel = q;
     });
@@ -217,7 +219,7 @@ export class Pipeline {
     const imc = solidBox(2.2, 0.4, 7, 0xff4fd8, { edge: 0.7 });
     imc.position.copy(IMC).setY(0.75);
     g.add(imc);
-    this.addLabel('Memory controller', 'label', IMC.x, 1.4, 4.4, [0.5, 0]);
+    this.minor.push(this.addLabel('Memory controller', 'label', IMC.x, 1.4, 4.4, [0.5, 0]));
     DIMM_X.forEach((x, k) => {
       const dimm = solidBox(0.9, 3.2, DIMM_HALF * 2, 0xff4fd8, { edge: 0.55, tint: 0.1 });
       dimm.position.set(x, 1.6, 0);
@@ -242,7 +244,7 @@ export class Pipeline {
     const root = solidBox(2, 0.4, 6, 0x3fd8ff, { edge: 0.7 });
     root.position.copy(ROOT).setY(0.75);
     g.add(root);
-    this.addLabel('PCIe root complex', 'label cyan', ROOT.x, 1.4, -4.2);
+    this.minor.push(this.addLabel('PCIe root complex', 'label cyan', ROOT.x, 1.4, -4.2));
     for (let k = 0; k < 8; k++) {
       g.add(polyline(pcieTrace(k), 0x3fd8ff, k === 2 || k === 5 ? 0.45 : 0.2));
     }
@@ -257,6 +259,7 @@ export class Pipeline {
     g.add(sfp);
     this.addLabel('Network card', 'label big', SLOT.x - 6, 5.4, SLOT.z);
     this.orderLabel = this.addLabel('', 'label gold', NIC_PORT.x, 3.4, NIC_PORT.z + 1.4);
+    this.minor.push(this.orderLabel);
   }
 
   buildParticles() {
@@ -599,10 +602,23 @@ export class Pipeline {
     return this.sentPrefix[lane][idx];
   }
 
+  // Phones get the scene without the clutter: no minor labels, no per-stage timers.
+  setCompact(on, showRings = true) {
+    this.compact = on;
+    for (const l of this.minor) l.visible = !on;
+    for (const l of this.stageLabels) l.visible = !on;
+    for (const st of this.stations) st.queueLabel.visible = !on || showRings;
+  }
+
   updateStageLabels() {
     const tl = this.timeline;
     const f = this.focus;
     this.stageLabels.forEach((l, s) => {
+      if (this.compact) {
+        const html = STAGE_TITLES[s];
+        if (l.userData.html !== html) { l.element.innerHTML = html; l.userData.html = html; }
+        return;
+      }
       const parts = tl.lanes.map((ls, lane) => {
         const d = ls.stageNs(f, s);
         return `<span style="color:${lane ? 'var(--tuned)' : 'var(--naive)'}">${d > 0 ? fmtNs(d) : '·'}</span>`;

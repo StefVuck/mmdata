@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Act } from './act.js';
 import { Script } from '../script.js';
-import { Comet, Follow, glow, label, lineMaterial, wireBox, polyline, smooth, lerp, dust } from '../fx.js';
+import { Comet, Follow, isNarrow, glow, label, lineMaterial, wireBox, polyline, smooth, lerp, dust } from '../fx.js';
 import { FIBRE_NS_PER_M, WIRE, TYPE_COLORS, TYPE_NAMES } from '../journey.js';
 
 const OPTIC = new THREE.Vector3(-11.4, 0.55, 1.5);
@@ -115,6 +115,7 @@ export class NicAct extends Act {
     s.add(diode);
     this.diode = diode;
     const ol = label('Optic · photodiode', 'label cyan');
+    ol.userData.beats = [0];
     ol.position.copy(OPTIC).add(new THREE.Vector3(0, 1.1, 0));
     s.add(ol);
 
@@ -123,6 +124,7 @@ export class NicAct extends Act {
     s.add(chip);
     this.chip = chip;
     const cl = label('PHY + MAC', 'label gold');
+    cl.userData.beats = [0, 1];
     cl.position.copy(CHIP).add(new THREE.Vector3(2.6, 0.7, 1.6));
     s.add(cl);
 
@@ -136,6 +138,7 @@ export class NicAct extends Act {
         new THREE.Vector3(1.5 + k * 0.8, 0.07, -3.2), new THREE.Vector3(1.5 + k * 0.8, 0.07, -3.9)], 0xffb02e, 0.3));
     }
     const pl = label('PCIe', 'label');
+    pl.userData.beats = [2];
     pl.position.set(4.4, 0.4, -4.6);
     s.add(pl);
   }
@@ -163,6 +166,7 @@ export class NicAct extends Act {
       this.cells.push(cell);
     }
     const rl = label('Ring buffer in process memory', 'label');
+    rl.userData.beats = [2, 3];
     rl.position.set(7, RING_Y + 0.9, RING_Z);
     s.add(rl);
 
@@ -178,6 +182,7 @@ export class NicAct extends Act {
     }
     CORE.copy(this.cores[3].position);
     const corel = label('Core 3 · spinning on the ring', 'label tuned');
+    corel.userData.beats = [3, 4];
     corel.position.copy(CORE).add(new THREE.Vector3(0, 0.9, 0));
     s.add(corel);
     this.pollRing = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.66, 48), glow(0x3fffb0, 0.6, { side: THREE.DoubleSide }));
@@ -188,6 +193,7 @@ export class NicAct extends Act {
     s.add(this.pollBeam);
 
     const kl = label('Kernel network stack, for comparison<br>interrupt · softirq · socket buffer · copy ≈ 5 µs', 'label ghost', true);
+    kl.userData.beats = [2];
     kl.position.set(-12.5, -1.3, -6.2);
     s.add(kl);
   }
@@ -243,6 +249,11 @@ export class NicAct extends Act {
     const p = sc.progress;
     const order = ['optic', 'unpack', 'dma', 'poll', 'end'];
     const stage = order.indexOf(sc.done ? 'end' : id);
+    // Phones show only the labels that belong to the current beat.
+    const narrow = isNarrow();
+    this.scene.traverse((o) => {
+      if (o.isCSS2DObject && o.userData.beats) o.visible = !narrow || o.userData.beats.includes(stage);
+    });
     const t = performance.now() / 1000;
 
     const opticP = stage === 0 ? p : 1;

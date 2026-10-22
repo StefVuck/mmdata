@@ -1,4 +1,4 @@
-# Microsecond in Slow Motion
+# A Trade in Slow Motion
 
 **Watch one market data packet become a trade.**
 
@@ -77,8 +77,11 @@ A trace from the synthetic feed, timed on x86 Linux, is committed in `web/public
 | ← → or 1 to 6 | change act |
 | F | toggle the follow camera |
 | N | jump to the next order (free play) |
+| V | narration on or off |
+| M | ambient sound on or off |
 | H | hide the overlay for a clean recording |
 | R | replay from the start |
+| Drag, scroll, pinch | orbit and zoom the camera in any 3D act; double-click or double-tap resets |
 
 A few URL parameters help with recordings and sharing a particular moment:
 
@@ -126,6 +129,32 @@ The viewer is a static site with relative paths, so it can be served from any ho
 
 To swap in a different trace, run `make trace` before `make web`, or drop a `trace.bin` into `web/dist` after building.
 
+### Link previews
+
+The page carries Open Graph and Twitter card tags, so a shared link shows a title, a description and a 1200×630 preview image (`web/public/og.png`) in iMessage, Slack, WhatsApp, LinkedIn, X and the like. Most of those apps only fetch the image from an absolute URL, so build with the address the site will live at:
+
+```sh
+cd web && SITE_URL=https://your-domain.example/path npx vite build
+```
+
+Without `SITE_URL` the tags use relative paths: the page still works, but previews may show no image. After deploying, paste the link into a preview checker such as opengraph.xyz, or LinkedIn's Post Inspector, to confirm; most apps cache previews, so check before sharing widely.
+
+`node tools/capture_og.cjs`, with `npx vite preview` running in `web/`, regenerates the preview image from the live title screen, and the Apple touch icon from `web/public/favicon.svg`.
+
+## Sound
+
+The tour is narrated, and each act has its own ambient bed (a data hall's hum, a fibre's shimmer, a switch's buzz, and so on) that crossfades as the packet moves and dips under the voice. The ambience is synthesised in the browser with Web Audio, so it costs no downloads. Both can be switched off from the chips under the act title, and the choice is remembered.
+
+The narration is recorded once, ahead of time, with ElevenLabs, so no API key ever reaches the browser. `tools/narrate.mjs` opens the viewer headlessly at desktop and phone sizes, reads every caption with the bundled trace's numbers, and saves one mp3 per line in `web/public/audio` alongside a `manifest.json`. Each beat then lasts at least as long as its line. Rerunning it only records lines that have changed, and removes recordings no caption uses any more.
+
+```sh
+node tools/narrate.mjs --dry-run                     # list the lines, about 4,600 characters
+ELEVENLABS_API_KEY=... node tools/narrate.mjs        # record them
+cd web && npx vite build
+```
+
+The default voice is Brian, a deep and measured stock narration voice; set `ELEVENLABS_VOICE_ID` to use another, such as George (`JBFqnCBsd6RMkjVDRZzb`) for a British reading or Bill (`pqHfZKP75CvOlQylNhV4`). The pronunciation of terms such as MoldUDP64, PCIe and L3 is set in `web/src/speech.js`. Any line without a recording, for example after swapping in a different trace, falls back to the browser's built-in voice.
+
 ## Regenerating the GIFs
 
 With `npx vite preview` running in `web/` and Playwright and Pillow installed, `node tools/capture_gifs.cjs docs/media` steps the film frame by frame and rewrites the clips above. Each clip's starting beat and length are listed at the top of the script.
@@ -135,9 +164,10 @@ With `npx vite preview` running in `web/` and Playwright and Pillow installed, `
 | Path | What it is |
 |---|---|
 | `decoder/` | `mmdecode`: feed loading, the two lanes, probes and the trace writer |
-| `tools/` | synthetic ITCH generator, Nasdaq fetch and slice scripts, GIF capture |
+| `tools/` | synthetic ITCH generator, Nasdaq fetch and slice scripts, GIF and preview capture, narration |
 | `web/src/acts/` | one module per act |
 | `web/src/core/` | the Act V pipeline renderer and order book terrain |
 | `web/src/code.js` | the code card, cut from the decoder source at build time |
 | `web/src/timing.js` | turns a trace into per-lane schedules and stall events |
+| `web/src/audio.js`, `speech.js` | narration playback, ambience, and the caption-to-speech text |
 | `docs/trace-format.md` | the binary format the decoder writes and the viewer reads |

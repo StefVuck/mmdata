@@ -4,6 +4,8 @@ import { Timeline } from './timing.js';
 import { Director } from './director.js';
 import { TYPE_NAMES } from './journey.js';
 import { fmtNs } from './fx.js';
+import { TitleBook } from './titlebook.js';
+import { sound } from './audio.js';
 
 async function boot() {
   const params = new URLSearchParams(location.search);
@@ -37,7 +39,33 @@ async function boot() {
   ].filter(Boolean).join(' · ');
 
   const title = document.getElementById('title');
+  const backdrop = new TitleBook(document.getElementById('title-bg'), trace);
+  backdrop.start();
+  // Restart the backdrop whenever the title screen comes back.
+  new MutationObserver(() => {
+    if (title.classList.contains('gone')) backdrop.stop();
+    else backdrop.start();
+  }).observe(title, { attributes: true, attributeFilter: ['class'] });
+  // Browsers only start audio after a click or key press, so the first one unlocks it.
+  const unlock = () => sound.unlock();
+  for (const ev of ['pointerdown', 'click', 'touchend', 'keydown']) window.addEventListener(ev, unlock, { once: true });
+  const titleSound = document.getElementById('title-sound-btn');
+  const titleSoundUi = () => {
+    const on = sound.narrationOn || sound.ambienceOn;
+    titleSound.textContent = on ? 'Sound on' : 'Sound off';
+    titleSound.classList.toggle('on', on);
+  };
+  titleSound.addEventListener('click', () => {
+    const on = !(sound.narrationOn || sound.ambienceOn);
+    sound.setNarration(on);
+    sound.setAmbience(on);
+    titleSoundUi();
+    director.soundUi();
+  });
+  titleSoundUi();
+
   const begin = (act) => {
+    sound.unlock();
     title.classList.add('gone');
     document.body.classList.remove('intro');
     director.start(act);
