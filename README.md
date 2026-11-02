@@ -4,7 +4,7 @@
 
 <!-- LIVE DEMO: once deployed, replace the line below with the real link, e.g.
 **[▶ Watch it live](https://your-deployment.example.com)** -->
-**▶ Live demo: link coming soon**
+**▶ Live demo: https://market.stefvuck.dev**
 
 > **Disclaimer.** This is a toy example written by an AI assistant (Claude) as a learning and visualisation exercise. It is not related to, derived from, endorsed by or representative of any employer's code, systems, infrastructure or trading practices, past or present. Nothing here reflects how any real firm builds or runs software. The "naive" and "tuned" builds are generic textbook illustrations, the trading logic is deliberately simplistic and not a real strategy, the bundled market data is synthetic, and the latency figures for hardware outside the decoder are typical published values rather than measurements of any real setup. It is provided as is, for education only, and is not investment advice.
 
